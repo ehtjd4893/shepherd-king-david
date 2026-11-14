@@ -94,7 +94,9 @@ export class StageScene extends Phaser.Scene {
 
   constructor() { super('stage'); }
 
-  init(data: { stage?: string }) { this.stageId = data.stage ?? 'field'; }
+  private startSection = 0; // > 0 when retrying after a fall: start at that section, not the whole stage
+
+  init(data: { stage?: string; section?: number }) { this.stageId = data.stage ?? 'field'; this.startSection = data.section ?? 0; }
 
   create() {
     this.stage = STAGES[this.stageId];
@@ -102,8 +104,11 @@ export class StageScene extends Phaser.Scene {
     this.ammo = this.stage.ammo ?? STONE_MAX; this.kos = 0; this.sheepLost = 0; this.hintsShown = 0;
     this.quake = null; this.bubble = null; this.brookT = 0; this.shots = []; this.saulDodged = 0; this.royalWarnAt = -9; this.rushers = []; this.allyCd = 0; this.stealthRun = null; this.bound = [];
     this.spinRing = null;
-    this.prog = { section: 0, wave: 0, locked: false, done: false };
+    this.prog = { section: this.startSection, wave: 0, locked: false, done: false };
     this.camX = this.hitstop = this.time0 = this.atkBuf = this.slingCd = 0;
+    const retryAt = this.startSection ? this.stage.sections[this.startSection].at : 0;
+    this.camX = retryAt;
+    this.hintsShown = this.stage.hints.filter(h => h.at < retryAt).length;
     this.score = (this.registry.get('score') as number) ?? 0;
     writeSave({ stage: this.stageId, score: this.score }); // continue from here next time
     this.faith = 40;
@@ -128,16 +133,17 @@ export class StageScene extends Phaser.Scene {
     this.fxg = this.add.graphics().setDepth(2);
     this.shade = this.add.rectangle(0, 0, 480, 270, 0x0a0c30, 0).setOrigin(0).setScrollFactor(0).setDepth(1500);
     this.topfx = this.add.graphics().setDepth(940);
-    this.player = this.makeFighter(this.stage.sword ? 'davidS' : 'david', '다윗', this.stage.start ?? 60, 210, 100);
+    const startX = this.startSection ? retryAt + 60 : this.stage.start ?? 60;
+    this.player = this.makeFighter(this.stage.sword ? 'davidS' : 'david', '다윗', startX, 210, 100);
     for (let i = 0; i < this.stage.sheep; i++) {
-      const x = 30 - (i % 3) * 18, y = 186 + ((i * 13) % 50);
+      const x = startX - 30 - (i % 3) * 18, y = 186 + ((i * 13) % 50);
       this.flock.push({ i, x, y, facing: 1, moving: false, carrier: null, img: this.add.image(x, y, 'shadow'), shadow: this.add.image(x, y, 'shadow').setDepth(1).setScale(0.8, 1) });
     }
     this.ctl = new Controls(this);
     this.ctl.setButton('ally', !!this.stage.allies);
     this.buildHud();
-    if (!this.stage.noBanner) {
-      this.texts.banner.setText(this.stage.title).setAlpha(1);
+    if (!this.stage.noBanner || this.startSection) {
+      this.texts.banner.setText(this.startSection ? '다시 한 번!' : this.stage.title).setAlpha(1);
       this.tweens.add({ targets: this.texts.banner, alpha: 0, delay: 1600, duration: 500 });
     }
   }
@@ -997,6 +1003,8 @@ export class StageScene extends Phaser.Scene {
 
     if (d.ai === 'thief' && !e.fights && this.thiefSteal(e, dt)) return;
 
+    // the spot beside David must be on screen while the fight is locked, or a boss pinned to the edge would never reach it
+    if (this.prog.locked && Math.abs(p.x + ai.side * d.reach - (this.camX + 240)) > 224) ai.side = (ai.side * -1) as 1 | -1;
     const tx = p.x + ai.side * d.reach, ty = Phaser.Math.Clamp(p.y + ai.lane, FLOOR_TOP, FLOOR_BOTTOM);
     const faceP = () => { e.facing = p.x >= e.x ? 1 : -1; };
     const playerOpen = p.state !== 'down' && p.state !== 'dead';
@@ -1201,7 +1209,7 @@ export class StageScene extends Phaser.Scene {
 
     if (this.ended) {
       const go = (this.ctl.attack || this.ctl.jump) && T > this.endAt + 0.6;
-      if (go && this.ended === 'dead') this.scene.restart({ stage: this.stageId });
+      if (go && this.ended === 'dead') this.scene.restart({ stage: this.stageId, section: this.prog.section }); // retry this section, full health
       if ((go || T > this.endAt + 4) && this.ended === 'clear') this.leave();
     } else if (this.hitstop > 0) {
       this.hitstop -= dt;
@@ -1262,7 +1270,7 @@ export class StageScene extends Phaser.Scene {
         this.texts.sub.setText(this.stage.sheep ? `지킨 양 ${kept} / ${this.stage.sheep} · 보너스 +${bonus}` : '');
       } else {
         this.texts.banner.setText('다윗이 쓰러졌다').setAlpha(1);
-        this.texts.sub.setText('공격 또는 점프로 다시 시작');
+        this.texts.sub.setText('공격 또는 점프로 이 구간부터 다시');
       }
     }
   }

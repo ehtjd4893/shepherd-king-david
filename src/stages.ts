@@ -40,7 +40,7 @@ export const STAGES: Record<string, StageDef> = {
       { at: 1260, waves: [[{ x: 520, y: 210, t: 'bear' }]] },
       {
         at: 1600, waves: [
-          [{ x: 520, y: 190, t: 'jackal' }, { x: 540, y: 220, t: 'jackal' }, { x: -40, y: 206, t: 'thief' }, { x: -60, y: 238, t: 'jackal' }],
+          [{ x: 520, y: 190, t: 'jackal' }, { x: 540, y: 220, t: 'jackal' }, { x: -40, y: 206, t: 'thief' }], // first stage: kept to three right after the bear
         ],
       },
       { at: 1920, waves: [[{ x: 520, y: 208, t: 'lion' }]] },

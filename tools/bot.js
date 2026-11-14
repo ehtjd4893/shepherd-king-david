@@ -48,7 +48,11 @@ export function play({ god = false, seconds = 240 } = {}) {
       if (Math.abs(gx - p.x) < 18 && Math.abs(gy - p.y) < 10) { dx = 0; dy = 0; if (f % 10 === 0) k = 'z'; }
     }
     else if (s.quake && p.state !== 'jump' && Math.abs(Math.abs(p.x - s.quake.x) - s.quake.t * 420) < 60) k = 'x';
-    else if (incoming || warn) dy = p.y < 207 ? 1 : -1;
+    else if (incoming || warn || (G && G.g.mode === 'thrust' && Math.abs(G.g.lane - p.y) <= 16)) {
+      // step away from the warned lane (not toward the screen middle, which can be the lane itself)
+      const lane = incoming ? incoming.y : warn ? laneOf(warn) : G.g.lane;
+      dy = lane > 232 ? -1 : lane < 182 ? 1 : (p.y >= lane ? 1 : -1);
+    }
     else if (G && G.state !== 'down' && G.g.mode === 'stuck') {
       dy = Math.abs(G.y - p.y) > 4 ? Math.sign(G.y - p.y) : 0;
       if (Math.sign(G.x - p.x) !== p.facing) dx = Math.sign(G.x - p.x);
