@@ -17,13 +17,15 @@ export function tap(k) { key(k, true); run(1); key(k, false); }
 function hold(k, on) { if (!!held[k] !== on) { key(k, on); held[k] = on; } }
 export const scenes = () => window.game.scene.getScenes(true).map(s => s.sys.settings.key).join();
 
-export function setup() { window.game.loop.sleep(); T = performance.now(); run(10); }
+let C = null;
+export async function setup() { C = await import('/src/combat.ts'); window.game.loop.sleep(); T = performance.now(); run(10); }
 
 /** Play the current stage. god: keep David alive (flow check); returns what happened. */
 export function play({ god = false, seconds = 240 } = {}) {
   const s = window.game.scene.getScene('stage'), p = s.player;
   if (god) p.hp = p.maxHp = 5000;
-  const log = [], ev = { hitsTaken: 0, deaths: 0, specials: 0, slings: 0, allies: 0 };
+  const log = [], ev = { hitsTaken: 0, deaths: 0, specials: 0, slings: 0, allies: 0, caught: 0 };
+  const caught0 = s.caught.bind(s); s.caught = () => { ev.caught++; return caught0(); };
   let last = JSON.stringify(s.prog), hp = p.hp, f = 0;
   for (; f < 60 * seconds && !s.ended; f++) {
     const live = s.enemies.filter(e => e.state !== 'dead' && e.state !== 'down' && !e.flee && !s.def(e).untouchable);
@@ -34,7 +36,18 @@ export function play({ god = false, seconds = 240 } = {}) {
     const warn = lethal.find(e => (e.ai?.mode === 'swing' && e.atk && e.t < e.atk.active[0] && (e.atk.keep || ['philD', 'saul'].includes(e.kind)) && Math.abs(laneOf(e) - p.y) <= 16)
       || (e.g?.mode === 'tele' && Math.abs(e.g.lane - p.y) <= 16));
     const G = lethal.find(e => e.g);
-    if (s.quake && p.state !== 'jump' && Math.abs(Math.abs(p.x - s.quake.x) - s.quake.t * 420) < 60) k = 'x';
+    const st = s.stealthRun, goal = st?.goals.find(g => !g.done);
+    if (goal) {
+      // sneak: head for the goal, sidestep anything a guard would see, never run near sleepers
+      const gx = st.at + goal.g.x, gy = goal.g.y, risky = (x, y) => st.sentries.some(se => !se.g.asleep && C.seen(se, { x, y }));
+      dx = Math.abs(gx - p.x) > 6 ? Math.sign(gx - p.x) : 0; dy = Math.abs(gy - p.y) > 4 ? Math.sign(gy - p.y) : 0;
+      if (risky(p.x + dx * 18, p.y + dy * 10) || st.sentries.some(se => se.meter > 0.15)) {
+        if (!risky(p.x - 18, p.y)) { dx = -1; dy = 0; } else if (!risky(p.x, p.y + 20)) { dx = 0; dy = 1; } else if (!risky(p.x, p.y - 20)) { dx = 0; dy = -1; } else { dx = 0; dy = 0; }
+      }
+      if (p.state === 'run') dx = 0;
+      if (Math.abs(gx - p.x) < 18 && Math.abs(gy - p.y) < 10) { dx = 0; dy = 0; if (f % 10 === 0) k = 'z'; }
+    }
+    else if (s.quake && p.state !== 'jump' && Math.abs(Math.abs(p.x - s.quake.x) - s.quake.t * 420) < 60) k = 'x';
     else if (incoming || warn) dy = p.y < 207 ? 1 : -1;
     else if (G && G.state !== 'down' && G.g.mode === 'stuck') {
       dy = Math.abs(G.y - p.y) > 4 ? Math.sign(G.y - p.y) : 0;

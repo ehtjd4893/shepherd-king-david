@@ -71,6 +71,7 @@ export const ENEMIES = {
   philA: { name: '블레셋 보병', hp: 40, speed: 95, reach: 34, hw: 6, attack: SOLDIER_SLASH, ai: 'soldier' },
   philB: { name: '블레셋 창병', hp: 32, speed: 85, reach: 62, hw: 6, attack: SOLDIER_THRUST, ai: 'soldier' },
   jackal: { name: '자칼', hp: 18, speed: 150, reach: 30, hw: 9, attack: BITE, ai: 'soldier' },
+  raider: { name: '광야 약탈자', hp: 30, speed: 95, reach: 34, hw: 6, attack: CLUB, ai: 'soldier' },
   thief: { name: '양 도둑', hp: 30, speed: 90, reach: 34, hw: 6, attack: CLUB, ai: 'thief' },
   bear: { name: '곰', hp: 150, speed: 62, reach: 44, hw: 16, attack: BEAR_SWIPE, ai: 'soldier', boss: true, special: { attack: BEAR_CHARGE, from: 110, to: 260, every: 3.5 } },
   philD: { name: '블레셋 궁수', hp: 26, speed: 80, reach: 150, hw: 6, attack: ARROW_SHOT, ai: 'archer' },
@@ -96,7 +97,11 @@ export function isDoubleTap(prevDir: number, prevAt: number, dir: number, now: n
 }
 
 export interface Spawn { x: number; y: number; t?: EnemyId } // x is relative to the section's screen (0..480); <0 or >480 = walks in
-export interface Section { at: number; waves: Spawn[][] }
+/** Stealth section (1 Sam 24, 26): Saul's men can't be fought; take the goals without being caught. Positions are screen-relative. */
+export interface Guard { x: number; y: number; from?: number; to?: number; asleep?: boolean }
+export interface Goal { x: number; y: number; kind: 'robe' | 'spear' | 'jug' }
+export interface Stealth { mood: 'cave' | 'night'; saul: { x: number; y: number }; guards: Guard[]; goals: Goal[] }
+export interface Section { at: number; waves: Spawn[][]; stealth?: Stealth }
 export interface Prog { section: number; wave: number; locked: boolean; done: boolean }
 
 export const LOCK_AT = 200; // player reaching section.at + LOCK_AT locks the screen
@@ -165,3 +170,21 @@ export function swordify(a: Attack): Attack {
 /** Adullam companions (1 Sam 22:2): three men charge across the screen, knocking down whoever they pass. */
 export const ALLY_COOLDOWN = 12, ALLY_SPEED = 260;
 export const ALLY_RUSH: Attack = { pose: 'walk', dur: 0, active: [0, 0], box: { from: -10, to: 12, height: 40 }, dmg: 12, knock: true, lunge: 0 };
+
+// ---------- Stealth (1 Sam 24, 26) ----------
+export const SIGHT_RANGE = 110, HEAR_RANGE = 60;
+/** A patrolling guard sees a cone in front of him that widens with distance (and anyone bumping into him). */
+export function seen(g: { x: number; y: number; facing: 1 | -1 }, t: { x: number; y: number }): boolean {
+  const dx = (t.x - g.x) * g.facing, dy = Math.abs(t.y - g.y);
+  if (Math.abs(t.x - g.x) < 14 && dy < 10) return true;
+  return dx >= 0 && dx <= SIGHT_RANGE && dy <= 8 + dx * 0.22;
+}
+/** Sleepers (1 Sam 26:12) only stir if David runs close by. */
+export function heard(g: { x: number; y: number }, t: { x: number; y: number }, running: boolean): boolean {
+  return running && Math.hypot(t.x - g.x, (t.y - g.y) * 2) <= HEAR_RANGE;
+}
+/** Suspicion fills while sensed and drains otherwise; at 1 David is caught. Gives kids a moment to back off. */
+export const SIGHT_RATE = 1.8, HEAR_RATE = 3.2; // footsteps wake a sleeper faster than a glimpse alarms a guard
+export function suspicion(meter: number, sensed: boolean, dt: number, rate = SIGHT_RATE): number {
+  return Math.min(1, Math.max(0, meter + (sensed ? rate : -1) * dt));
+}

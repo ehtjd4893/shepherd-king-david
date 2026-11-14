@@ -116,6 +116,19 @@ export const CUTSCENES: Record<string, Cutscene> = {
     ],
     next: { scene: 'stage', id: 'keilah' },
   },
+  spare: {
+    bg: 'wild',
+    beats: [
+      { text: '동굴에서 나온 사울 뒤로, 다윗이 따라 나와 땅에 엎드려 절했다. (삼상 24:8)', actors: [{ id: 'saul', x: 330, y: 188, flip: true }, { id: 'davidS', x: 210, y: 190 }] },
+      { who: 'david', text: '내 아버지여, 보십시오. 왕의 옷자락을 베었지만 왕을 해치지 않았습니다. 여호와께서 기름 부으신 분께 손댈 수 없습니다. (삼상 24:6, 11)' },
+      { who: 'saul', text: '내 아들 다윗아… 너는 나보다 의롭구나. 나는 너를 악으로 갚았는데, 너는 나를 선으로 갚았다. (삼상 24:16-17)' },
+      { text: '얼마 뒤 십 광야에서도, 다윗은 잠든 사울의 창과 물병만 가지고 나왔다. 여호와께서 그들을 깊이 잠들게 하셨다. (삼상 26:12)', actors: [{ id: 'davidS', x: 160, y: 190 }, { id: 'saul', x: 360, y: 188, flip: true }] },
+      { who: 'david', text: '아브넬아, 왕을 지키지 않고 무엇을 했느냐? 왕의 창과 물병이 어디 있는지 찾아보아라! (삼상 26:15-16)' },
+      { who: 'saul', text: '내 아들 다윗아, 네게 복이 있기를 바란다. 네가 큰일을 하겠고, 반드시 이기리라. (삼상 26:25)' },
+      { text: '그래도 다윗은 사울을 피해 블레셋 땅으로 가서, 시글락 성읍에 머물게 되었다. (삼상 27:1-6)', actors: [] },
+    ],
+    next: { scene: 'title' }, // TODO(stage 6): → ziklag
+  },
   keilahAfter: {
     bg: 'wild',
     beats: [
@@ -124,6 +137,6 @@ export const CUTSCENES: Record<string, Cutscene> = {
       { who: 'jonathan', text: '두려워 말게. 아버지의 손이 자네에게 미치지 못할 걸세. 자네는 이스라엘의 왕이 되고, 나는 그 다음이 될 걸세. (삼상 23:16-17)', actors: [{ id: 'jonathan', x: 280, y: 186, flip: true }, { id: 'davidS', x: 210, y: 190 }] },
       { text: '두 사람은 여호와 앞에서 언약을 맺고, 요나단은 집으로 돌아갔다. 다윗은 엔게디 요새로 올라갔다. (삼상 23:18, 29)', actors: [{ id: 'davidS', x: 230, y: 190 }] },
     ],
-    next: { scene: 'title' }, // TODO(stage 5): → engedi
+    next: { scene: 'stage', id: 'engedi' },
   },
 };

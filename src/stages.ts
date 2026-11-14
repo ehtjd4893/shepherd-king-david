@@ -131,4 +131,39 @@ export const STAGES: Record<string, StageDef> = {
     ],
     next: { scene: 'cutscene', id: 'keilahAfter' },
   },
+  engedi: {
+    title: 'STAGE 5 · 엔게디와 십 광야',
+    width: 1920,
+    bg: 'wild',
+    sheep: 0,
+    harp: true,
+    sword: true,
+    allies: true,
+    hints: [
+      { at: 0, pc: '광야 약탈자들이다! 동료(G)와 함께 물리치세요', touch: '광야 약탈자들이다! 동료 버튼과 함께 물리치세요' },
+      { at: 560, pc: '사울의 군사는 공격할 수 없다! 노란 시야를 피해 다가가 사울의 옷자락을 베세요 (Z)', touch: '사울의 군사는 공격할 수 없다! 노란 시야를 피해 다가가 사울의 옷자락을 베세요 (공격)' },
+      { at: 1440, pc: '모두 깊이 잠들었다. 달리면 깨니 걸어서 다가가 창과 물병을 챙기세요 (Z)', touch: '모두 깊이 잠들었다. 달리면 깨니 걸어서 다가가 창과 물병을 챙기세요 (공격)' },
+    ],
+    sections: [
+      { at: 0, waves: [[{ x: 520, y: 200, t: 'raider' }, { x: 540, y: 232, t: 'raider' }, { x: -40, y: 214, t: 'jackal' }]] },
+      {
+        at: 560, waves: [[]],
+        stealth: {
+          mood: 'cave', saul: { x: 440, y: 200 },
+          guards: [{ x: 300, y: 196, from: 220, to: 380 }, { x: 360, y: 232, from: 260, to: 420 }],
+          goals: [{ x: 418, y: 214, kind: 'robe' }],
+        },
+      },
+      { at: 1100, waves: [[{ x: 520, y: 196, t: 'raider' }, { x: 540, y: 226, t: 'raider' }, { x: -40, y: 210, t: 'raider' }, { x: -60, y: 238, t: 'jackal' }, { x: 560, y: 186, t: 'jackal' }]] },
+      {
+        at: 1440, waves: [[]],
+        stealth: {
+          mood: 'night', saul: { x: 360, y: 214 },
+          guards: [{ x: 210, y: 196, asleep: true }, { x: 290, y: 238, asleep: true }, { x: 430, y: 204, asleep: true }, { x: 300, y: 184, asleep: true }],
+          goals: [{ x: 386, y: 206, kind: 'spear' }, { x: 336, y: 224, kind: 'jug' }],
+        },
+      },
+    ],
+    next: { scene: 'cutscene', id: 'spare' },
+  },
 };
