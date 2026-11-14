@@ -1,0 +1,16 @@
+{
+  "name": "목동왕 다윗",
+  "short_name": "목동왕 다윗",
+  "description": "양 치던 소년이 왕이 되기까지 — 사무엘상·하 벨트스크롤 액션",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#1c1226",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

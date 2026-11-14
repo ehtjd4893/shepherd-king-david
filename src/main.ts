@@ -21,3 +21,12 @@ const game = new Phaser.Game({
   scene: [TitleScene, CutsceneScene, StageScene, ShaftScene, CreditsScene],
 });
 if (import.meta.env.DEV) Object.assign(window, { game }); // dev-only handle for poking at state from the console
+
+// Installable + offline (production build only): register the service worker, then hand it every file this page loaded.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(async () => {
+    const reg = await navigator.serviceWorker.ready;
+    const urls = [location.href.split('#')[0], ...performance.getEntriesByType('resource').map(r => r.name)];
+    reg.active?.postMessage({ type: 'cache', urls });
+  }).catch(err => console.warn('offline mode unavailable:', err));
+}
