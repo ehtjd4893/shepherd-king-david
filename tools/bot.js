@@ -64,6 +64,10 @@ export function play({ god = false, seconds = 240 } = {}) {
       const want = e.x - (e.x > p.x ? 32 : -32);
       dx = Math.abs(want - p.x) > 4 ? Math.sign(want - p.x) : 0; dy = Math.abs(e.y - p.y) > 3 ? Math.sign(e.y - p.y) : 0;
       if (!k && !dx && !dy) { if (Math.sign(e.x - p.x) !== p.facing) dx = Math.sign(e.x - p.x); else if (f % 6 === 0) k = 'z'; }
+    } else if (s.bound?.some(b => !b.done)) { // untie the captives
+      const b = s.bound.find(b => !b.done);
+      dx = Math.abs(b.x - p.x) > 6 ? Math.sign(b.x - p.x) : 0; dy = Math.abs(b.c.y - p.y) > 4 ? Math.sign(b.c.y - p.y) : 0;
+      if (Math.abs(b.x - p.x) < 18 && Math.abs(b.c.y - p.y) < 10 && f % 10 === 0) { dx = 0; dy = 0; k = 'z'; }
     } else if (G) { // bait Goliath's thrust from ~110px on his lane
       const want = G.x - Math.sign(G.x - p.x || 1) * 110; dx = Math.abs(want - p.x) > 6 ? Math.sign(want - p.x) : 0; dy = Math.abs(G.y - p.y) > 4 ? Math.sign(G.y - p.y) : 0;
     } else if (s.botGoal) { [dx, dy, k] = s.botGoal(p, f) ?? [0, 0, null]; } // stage-specific objective (stealth etc.)

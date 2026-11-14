@@ -55,13 +55,19 @@ const LION_POUNCE: Attack = { pose: 'atk', dur: 0.95, active: [0.45, 0.9], box: 
 /** Archer: aim (bow drawn, warning line), loose at active[0]; the arrow itself does the damage. */
 /** Philistine captain: crouches behind his shield, then charges down the lane. */
 const SHIELD_CHARGE: Attack = { pose: 'atk', dur: 0.9, active: [0.45, 0.85], box: { from: -4, to: 40, height: 40 }, dmg: 14, knock: true, lunge: 230, keep: true };
+const SCIMITAR: Attack = { pose: 'atk', dur: 0.34, active: [0.18, 0.26], box: { from: 0, to: 36, height: 30 }, dmg: 10, knock: false, lunge: 120 };
+/** Camel rider: the whole crossing is one long active window; the warning comes first (see camelPhase). */
+const CAMEL_CHARGE: Attack = { pose: 'walk', dur: 99, active: [0, 99], box: { from: -12, to: 22, height: 40 }, dmg: 14, knock: true, lunge: 0 };
+/** Amalekite chief: a wide sweep that catches both sides, and a charge down the lane. */
+const CHIEF_SWEEP: Attack = { pose: 'atk', dur: 0.55, active: [0.32, 0.4], box: { from: -30, to: 50, height: 40 }, dmg: 14, knock: false, lunge: 60 };
+const CHIEF_CHARGE: Attack = { pose: 'atk', dur: 0.9, active: [0.45, 0.85], box: { from: -4, to: 40, height: 40 }, dmg: 14, knock: true, lunge: 240, keep: true };
 const ARROW_SHOT: Attack = { pose: 'atk', dur: 0.8, active: [0.6, 0.6], box: { from: 0, to: 0, height: 0 }, dmg: 8, knock: false, lunge: 0 };
 /** Saul: raise the spear over the lane for a moment, then hurl it. */
 const SAUL_THROW: Attack = { pose: 'throw', dur: 1.1, active: [0.8, 0.8], box: { from: 0, to: 0, height: 0 }, dmg: 22, knock: true, lunge: 0 };
 
 export interface EnemyDef {
   name: string; hp: number; speed: number; reach: number; hw: number; attack: Attack;
-  ai: 'soldier' | 'thief' | 'goliath' | 'archer' | 'saul'; boss?: boolean; scale?: number;
+  ai: 'soldier' | 'thief' | 'goliath' | 'archer' | 'saul' | 'camel'; boss?: boolean; scale?: number;
   /** King Saul: David will not raise his hand against the LORD's anointed (1 Sam 24:6) */
   untouchable?: boolean;
   /** extra move used from a distance (bear charge, lion pounce) */
@@ -77,6 +83,9 @@ export const ENEMIES = {
   philD: { name: '블레셋 궁수', hp: 26, speed: 80, reach: 150, hw: 6, attack: ARROW_SHOT, ai: 'archer' },
   saul: { name: '사울 왕', hp: 9999, speed: 0, reach: 0, hw: 8, attack: SAUL_THROW, ai: 'saul', untouchable: true },
   captain: { name: '블레셋 대장', hp: 160, speed: 85, reach: 38, hw: 8, attack: SOLDIER_SLASH, ai: 'soldier', boss: true, scale: 1.3, special: { attack: SHIELD_CHARGE, from: 90, to: 240, every: 3 } },
+  amalek: { name: '아말렉 병사', hp: 34, speed: 100, reach: 36, hw: 6, attack: SCIMITAR, ai: 'soldier' },
+  camel: { name: '낙타 기병', hp: 20, speed: 0, reach: 0, hw: 14, attack: CAMEL_CHARGE, ai: 'camel' },
+  chief: { name: '아말렉 대장', hp: 180, speed: 95, reach: 40, hw: 9, attack: CHIEF_SWEEP, ai: 'soldier', boss: true, scale: 1.35, special: { attack: CHIEF_CHARGE, from: 90, to: 240, every: 3.2 } },
   philC: { name: '방패병', hp: 44, speed: 70, reach: 34, hw: 6, attack: SOLDIER_SLASH, ai: 'soldier' },
   goliath: { name: '골리앗', hp: 100, speed: 34, reach: 90, hw: 22, attack: SOLDIER_THRUST, ai: 'goliath', boss: true, scale: 1.6 },
   lion: { name: '사자', hp: 200, speed: 120, reach: 42, hw: 15, attack: LION_CLAW, ai: 'soldier', boss: true, special: { attack: LION_POUNCE, from: 80, to: 180, every: 2.4 } },
@@ -101,7 +110,9 @@ export interface Spawn { x: number; y: number; t?: EnemyId } // x is relative to
 export interface Guard { x: number; y: number; from?: number; to?: number; asleep?: boolean }
 export interface Goal { x: number; y: number; kind: 'robe' | 'spear' | 'jug' }
 export interface Stealth { mood: 'cave' | 'night'; saul: { x: number; y: number }; guards: Guard[]; goals: Goal[] }
-export interface Section { at: number; waves: Spawn[][]; stealth?: Stealth }
+/** Captives to untie (1 Sam 30:18-19); the section ends only when everyone is freed. */
+export interface Captive { x: number; y: number; who: 'villager' | 'child' }
+export interface Section { at: number; waves: Spawn[][]; stealth?: Stealth; captives?: Captive[] }
 export interface Prog { section: number; wave: number; locked: boolean; done: boolean }
 
 export const LOCK_AT = 200; // player reaching section.at + LOCK_AT locks the screen
@@ -187,4 +198,14 @@ export function heard(g: { x: number; y: number }, t: { x: number; y: number }, 
 export const SIGHT_RATE = 1.8, HEAR_RATE = 3.2; // footsteps wake a sleeper faster than a glimpse alarms a guard
 export function suspicion(meter: number, sensed: boolean, dt: number, rate = SIGHT_RATE): number {
   return Math.min(1, Math.max(0, meter + (sensed ? rate : -1) * dt));
+}
+
+// ---------- Ziklag (1 Sam 30) ----------
+/** Camel riders wait at the screen edge with a warning line over their lane, then gallop across it. */
+export const CAMEL_WARN = 0.9, CAMEL_SPEED = 280;
+export function camelPhase(t: number): 'warn' | 'charge' { return t < CAMEL_WARN ? 'warn' : 'charge'; }
+/** The chief calls camel riders each time his health drops past one of these. */
+export const CHIEF_CALLS = [120, 60];
+export function chiefCalls(before: number, after: number): number {
+  return CHIEF_CALLS.filter(h => before > h && after <= h).length;
 }

@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
-import { frameOf, downOf, sheepFrame, portraitOf, bgBeth, bgField, bgElah, bgGibeah, bgWild, frame, R } from './art.ts';
+import { frameOf, downOf, sheepFrame, portraitOf, bgBeth, bgField, bgElah, bgGibeah, bgWild, bgZiklag, frame, R } from './art.ts';
 import { sfx } from './sfx.ts';
 import { CUTSCENES, NAMES, type Actor, type Cutscene } from './cutscenes.ts';
+
+const BACKDROPS = { beth: bgBeth, field: () => bgField(480), elah: () => bgElah(480), gibeah: () => bgGibeah(480), wild: () => bgWild(480), ziklag: () => bgZiklag(480) };
 
 const FONT = '"Do Hyeon", "Apple SD Gothic Neo", sans-serif';
 const CPS = 30; // characters typed per second
@@ -22,6 +24,8 @@ export class CutsceneScene extends Phaser.Scene {
   private fx!: Phaser.GameObjects.Graphics;
   private ui!: Phaser.GameObjects.Graphics;
   private anointing = false;
+  private gilboa = false;
+  private backdrop!: Phaser.GameObjects.Image;
   private qteGot = 0;
   private scribbles: number[][] = [];
   private qteText!: Phaser.GameObjects.Text;
@@ -31,17 +35,12 @@ export class CutsceneScene extends Phaser.Scene {
 
   init(d: { id: string }) {
     this.cs = CUTSCENES[d.id];
-    this.i = 0; this.lineT = 0; this.T = 0; this.started = false; this.cast = []; this.anointing = false; this.qteGot = 0; this.scribbles = [];
+    this.i = 0; this.lineT = 0; this.T = 0; this.started = false; this.cast = []; this.anointing = false; this.gilboa = false; this.qteGot = 0; this.scribbles = [];
   }
 
   create() {
-    const bg = this.cs.bg;
-    if (bg === 'dark') this.add.rectangle(0, 0, 480, 270, 0x0d0a14).setOrigin(0);
-    else {
-      const key = `bg_${bg}480`;
-      if (!this.textures.exists(key)) this.textures.addCanvas(key, bg === 'beth' ? bgBeth() : bg === 'elah' ? bgElah(480) : bg === 'gibeah' ? bgGibeah(480) : bg === 'wild' ? bgWild(480) : bgField(480));
-      this.add.image(0, 0, key).setOrigin(0);
-    }
+    this.backdrop = this.add.image(0, 0, '__DEFAULT').setOrigin(0);
+    this.setBackdrop(this.cs.bg);
     this.fx = this.add.graphics().setDepth(500);
     this.ui = this.add.graphics().setDepth(1003);
     if (!this.textures.exists('dlgbox')) this.textures.createCanvas('dlgbox', 480, 270);
@@ -63,6 +62,13 @@ export class CutsceneScene extends Phaser.Scene {
     } else this.startLine(0);
   }
 
+  private setBackdrop(bg: Cutscene['bg']) {
+    if (bg === 'dark') { this.backdrop.setVisible(false); return; }
+    const key = `bg_${bg}480`;
+    if (!this.textures.exists(key)) this.textures.addCanvas(key, BACKDROPS[bg]());
+    this.backdrop.setTexture(key).setVisible(true);
+  }
+
   private frameKey(id: string, anim: string, f: number, k = 1, down = false) {
     const key = `cs_${id}_${anim}_${f}_${k}${down ? '_L' : ''}`;
     if (!this.textures.exists(key)) {
@@ -79,6 +85,8 @@ export class CutsceneScene extends Phaser.Scene {
     const b = this.cs.beats[i];
     this.qteGot = 0; this.scribbles = [];
     if (b.banner) this.banner(b.banner);
+    if (b.bg) this.setBackdrop(b.bg);
+    if (b.fx === 'gilboa') this.gilboa = true; else if (b.bg) this.gilboa = false;
     if (b.fx === 'anoint') this.anointing = true;
     else if (b.actors) this.anointing = false;
     if (b.actors) {
@@ -170,6 +178,17 @@ export class CutsceneScene extends Phaser.Scene {
         const ph = (this.T * 0.5 + i / 14) % 1, x = Math.round(236 + Math.sin(i * 2.1) * 16), y = Math.round(176 - ph * 50);
         if ((Math.floor(this.T * 8) + i) % 3) { this.fx.fillStyle(i % 3 ? 0xf2c14e : 0xffffff, 1).fillRect(x - 1, y, 3, 1).fillRect(x, y - 1, 1, 3); }
       }
+    }
+    if (this.gilboa) {
+      // Mount Gilboa at dusk, only in silhouette: Saul's crown and Jonathan's bow fall onto the slope
+      const sky = [0x2a0a12, 0x4a1418, 0x6a2018, 0x8a3018, 0x3a1010];
+      sky.forEach((c, i) => this.fx.fillStyle(c, 1).fillRect(0, i * 34, 480, 34));
+      this.fx.fillStyle(0x3a1010, 1).fillRect(0, 170, 480, 100);
+      this.fx.fillStyle(0x0d0a14, 1);
+      for (let x = 0; x < 480; x += 2) { const h = 96 + Math.abs(x - 232) * 0.42 + Math.sin(x * 0.07) * 4; this.fx.fillRect(x, h, 2, 270 - h); }
+      const t = Math.min(1, this.lineT / 2.2), cy = 30 + t * 64, by = 20 + Math.min(1, this.lineT / 2.6) * 86;
+      this.fx.fillStyle(0xf2c14e, 1).fillRect(204, cy, 20, 6).fillTriangle(204, cy, 208, cy - 7, 212, cy).fillTriangle(212, cy, 216, cy - 7, 220, cy).fillTriangle(218, cy, 222, cy - 6, 224, cy);
+      this.fx.lineStyle(2, 0x9a6a40, 1).beginPath().arc(262, by + 10, 14, -1.2, 1.2).strokePath().lineStyle(1, 0xe8e0cc, 1).lineBetween(262 + 14 * Math.cos(-1.2), by + 10 + 14 * Math.sin(-1.2), 262 + 14 * Math.cos(1.2), by + 10 + 14 * Math.sin(1.2));
     }
     this.ui.clear();
     const q = b.qte;

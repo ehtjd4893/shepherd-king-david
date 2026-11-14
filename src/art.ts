@@ -136,6 +136,7 @@ function human(S,P,k,wu){
     else if(P.item==='gsword'){seg(1,21,t2+1,C.ironL);seg(-12,21,1,C.iron);seg(-20,23,Math.max(1,t2-1),C.ironL);L(g,hx+dy*3.5*k,hy-dx*3.5*k,hx-dy*3.5*k,hy+dx*3.5*k,t2+1,C.bronze);seg(4,0,t2+1,C.woodD);D(g,hx-dx*4.5*k,hy-dy*4.5*k,Math.max(1,rd(1.3*k)),C.bronze)}
     else if(P.item==='sword'){seg(1,13,t2,C.ironL);seg(-9,13,u1,C.iron);L(g,hx+dy*2.5*k,hy-dx*2.5*k,hx-dy*2.5*k,hy+dx*2.5*k,t2,C.bronze);seg(3,0,t2,C.woodD)}
     else if(P.item==='spear'){const n=S.spearLen||24;seg(14,n,Math.max(2,rd(2.4*k)),C.wood);seg(-(n-1),n+6,Math.max(2,rd(3*k)),C.iron);seg(-(n+5),n+8,u1,C.ironL)}
+    else if(P.item==='scimitar'){const pts=[0,4,8,12,15].map((d,i)=>[hx+dx*d*k-dy*i*i*.35*k,hy+dy*d*k+dx*i*i*.35*k]);for(let i=1;i<pts.length;i++)L(g,pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1],t2+(i<3?1:0),C.ironL);seg(3,0,t2,C.woodD);L(g,hx+dy*2*k,hy-dx*2*k,hx-dy*2*k,hy+dx*2*k,t2,C.gold)}
     else if(P.item==='club'){seg(2,12,t2+1,C.woodD);D(g,hx+dx*12*k,hy+dy*12*k,Math.max(1,rd(1.8*k)),C.wood)}
     else if(P.item==='horn'){seg(1,4,t2+1,C.white);seg(-3,7,t2,C.whiteD);seg(-1,2,t2+1,C.goldD)}
   }
@@ -213,6 +214,7 @@ const POSE={
     case 'atkA':return sp?{lean:-2,fF:[4,0],fB:[-5,0],hF:[-3,-20],hB:[-6,-18],item:it,ia:-.08,shield:sh}:{lean:-1,fF:[4,0],fB:[-4,0],hF:[-1,-30],hB:[-5,-17],item:it,ia:-2.4,shield:sh};
     case 'atk':return sp?{lean:3,fF:[8,0],fB:[-5,0],hF:[15,-19],hB:[6,-19],item:it,ia:-.02,shield:sh,mouth:1}:{lean:3,fF:[8,0],fB:[-5,0],hF:[11,-17],hB:[-3,-17],item:it,ia:.35,shield:sh,mouth:1};
     case 'hurt':return{lean:-4,hy:-1,fF:[2,0],fB:[-7,0],hF:[-3,-23],hB:[-8,-21],item:it,ia:-2.0,shield:sh,mouth:1};
+    case 'ride':return{kF:[6,-9],fF:[5,-3],kB:[0,-9],fB:[-1,-3],hF:[9,-24+b],hB:[-3,-17],item:it,ia:-.9,mouth:f%2};
     case 'throw':return{lean:-2,fF:[5,0],fB:[-5,0],hF:[-4,-33],hB:[3,-20],item:it,ia:-.25,mouth:1};
     case 'sweep':return{lean:3,fF:[9,0],fB:[-6,0],hF:[14,-20],hB:[6,-19],item:it,ia:.15,shield:sh,mouth:1};
     case 'stuck':return{lean:5,bob:2,hy:2,fF:[8,0],fB:[-7,0],hF:[13,-10],hB:[8,-11],item:it,ia:.85,mouth:1};
@@ -220,7 +222,7 @@ const POSE={
     default:return{bob:b,hF:[7,-16+b],hB:[-3,-16+b],item:it,ia:ia0,shield:sh}}},
   samuel(a,f){const b=f%2;if(a==='anoint')return{lean:1,hF:[9,-43],hB:[-3,-15],item:'horn',ia:.8};return{bob:b,hF:[6,-17+b],hB:[-4,-14+b],item:'horn',ia:-.7}},
   jesse(a,f){const b=f%2;return{bob:b,hF:[6,-14+b],hB:[-4,-14+b],item:'staff',ia:-1.5}},
-  bro(a,f){const b=f%2;return{bob:b,hF:[4,-15+b],hB:[-4,-15+b]}}
+  bro(a,f){const b=f%2;if(a==='tied')return{bob:6,kF:[6,-7],fF:[6,0],kB:[-2,-1],fB:[-7,-1],hF:[-3,-12],hB:[-5,-12],hy:1};if(a==='walk'){const w=W(f);return{...w,hF:[4+w.sw,-15+w.bob],hB:[-4-w.sw,-15+w.bob]}}return{bob:b,hF:[4,-15+b],hB:[-4,-15+b]}}
 };
 
 /* ---------- cast ---------- */
@@ -251,6 +253,12 @@ CAST.ally2={...allyBase,hair:C.red,hairL:C.redL,hairStyle:'curly',tunic:C.olive,
 CAST.ally3={...allyBase,hair:C.dark,hairStyle:'hood',hood:'#6a6a7a',beard:C.beard,beardD:C.beardD,beardLen:5,tunic:'#7a7a88',tunicD:'#55556a',tunicL:'#9a9aa8',sash:C.oatD,weapon:'club'};
 CAST.captain={...CAST.philA,armor:'scale',armorC:C.bronze,armorD:C.bronzeD,sash:C.gold,trim:C.gold,shield:1,tunic:C.kiltD,tunicD:'#5a1a1a',tunicL:C.kilt};
 CAST.guard={skin:C.skin,skinD:C.skinD,hair:C.dark,hairStyle:'helmet',beard:C.beard,beardD:C.beardD,beardLen:3,browC:C.out,tunic:C.blue,tunicD:C.blueD,tunicL:C.blueL,sash:C.leather,armor:'bands',armorC:C.bronze,armorD:C.bronzeD,leg:C.skin,legD:C.skinD,shoe:C.woodD,pose:'soldier',weapon:'spear',spearLen:18,wu:92};
+CAST.amalek={skin:C.skinP,skinD:C.skinPD,hair:C.dark,hairStyle:'hood',hood:'#e0c890',tunic:'#6a3a5a',tunicD:'#4a2440',tunicL:'#8a5a7a',sash:'#e0c890',fringe:1,beard:C.beard,beardD:C.beardD,beardLen:5,leg:C.skinP,legD:C.skinPD,shoe:C.woodD,pose:'soldier',weapon:'scimitar',wu:80};
+CAST.chief={...CAST.amalek,hood:'#c8402a',tunic:'#3a2440',tunicD:'#24142a',tunicL:'#5a3a60',armor:'bands',armorC:C.gold,armorD:C.goldD,trim:C.gold,sash:C.gold,beardLen:8};
+CAST.camel={beast:1,size:1.6,wu:56,hu:52,body:[-2,-21,12,6.5],head:[15,-34,3.6],snout:4,ear:'round',tail:'tuft',mane:null,neck:1,hump:1,col:'#c49a62',colD:'#8a6a40',colL:'#dcb882',belly:'#d8b888',rider:'amalek'};
+CAST.villager={skin:C.skin,skinD:C.skinD,hair:C.dark,hairStyle:'hood',hood:'#5a8ab0',tunic:'#e8d8b8',tunicD:'#b8a888',tunicL:'#fff0d8',sash:'#5a8ab0',robe:1,blush:'#e3806a',leg:C.skin,legD:C.skinD,shoe:C.wood,pose:'bro',wu:40};
+CAST.child={...CAST.villager,hairStyle:'curly',hair:C.dark,hairL:'#5a4030',tunic:'#c8a060',tunicD:'#9a7a48',tunicL:'#e0c080',robe:0,tall:.72};
+CAST.egypt={skin:'#a8704a',skinD:'#7a4e30',hair:'#1c1226',hairStyle:'king',tunic:'#f2eee2',tunicD:'#c8c0aa',tunicL:'#ffffff',sash:C.gold,leg:'#a8704a',legD:'#7a4e30',shoe:C.woodD,pose:'bro',wu:40,tall:.9};
 CAST.jonathan={skin:C.skin,skinD:C.skinD,hair:C.dark,hairStyle:'king',tunic:C.blue,tunicD:C.blueD,tunicL:C.blueL,sash:C.gold,trim:C.gold,leg:C.skin,legD:C.skinD,shoe:C.wood,pose:'bro',wu:40,tall:1.06};
 CAST.thief={skin:C.skinP,skinD:C.skinPD,hair:C.dark,hairStyle:'hood',hood:'#7a5a3c',tunic:'#5c4433',tunicD:'#3e2c20',tunicL:'#7a5c44',sash:C.oatD,fringe:1,beard:C.beard,beardD:C.beardD,beardLen:3,leg:C.skinP,legD:C.skinPD,shoe:C.woodD,pose:'soldier',weapon:'club',wu:80};
 CAST.raider={...CAST.thief,hood:'#8a3a30',tunic:'#a8865a',tunicD:'#7a5e3e',tunicL:'#c8a676',sash:C.kiltD};
@@ -279,7 +287,11 @@ export const KB=1.35; // battle scale from the draft
 const cache=new Map();
 // One frame = canvas + feet anchor (ox, oy) in canvas pixels.
 export function frameOf(id,anim,f=0,k=KB){const key=id+'|'+anim+'|'+f+'|'+k;let s=cache.get(key);
-  if(!s){const S=CAST[id];s=S.beast?beast(S,BPOSE(anim,f,id),k):human(S,POSE[S.pose](anim,f,S),k,S.wu);cache.set(key,s)}return s}
+  if(!s){const S=CAST[id];s=S.beast?beast(S,BPOSE(anim,f,id),k):human(S,POSE[S.pose](anim,f,S),k,S.wu);if(S.rider)s=withRider(s,S,anim,f,k);cache.set(key,s)}return s}
+// Camel with its rider sitting on the hump (one combined frame, so it moves and flips as one).
+function withRider(s,S,anim,f,k){const R2=CAST[S.rider],rd2=human(R2,POSE[R2.pose](anim==='atk'||anim==='atkA'?'atk':'ride',f,R2),k,R2.wu);
+  const z=S.size*k,up=rd(26*z),c=mk(s.c.width,s.c.height+up),g=ctx2(c);g.drawImage(s.c,0,up);
+  g.drawImage(rd2.c,s.ox-rd2.ox-rd(2*z),up+s.oy-rd((-S.body[1]+S.body[3]*1.2)*z)-rd2.oy+rd(9*k));return{c,ox:s.ox,oy:s.oy+up,k}}
 // Knocked-down frame: people fall on their back, animals roll over legs-up.
 export function downOf(id,anim,f=0,k=KB){const s=frameOf(id,anim,f,k);return CAST[id].beast?upsideOf(s,CAST[id]):lyingOf(s)}
 export const isBeast=id=>!!CAST[id].beast;
@@ -310,7 +322,9 @@ function beast(S,P,k){
   if(S.tail==='bushy'){const[e0,e1]=T(bx-brx-8,by+3+tw*2);L(g,ta,tb,e0,e1,Math.max(3,rd(3.5*z)),S.col);D(g,e0,e1,Math.max(1,rd(1.5*z)),S.colL)}
   else if(S.tail==='tuft'){const[m0,m1]=T(bx-brx-5,by-4+tw),[e0,e1]=T(bx-brx-8,by-9+tw);L(g,ta,tb,m0,m1,Math.max(2,rd(1.5*z)),S.col);L(g,m0,m1,e0,e1,Math.max(2,rd(1.5*z)),S.col);D(g,e0,e1,Math.max(2,rd(2*z)),S.mane)}
   else D(g,ta,tb,Math.max(2,rd(2.5*z)),S.col);
+  if(S.neck){const[n0,n1]=T(bx+brx*.55,by-bry*.4),[m0,m1]=T(hx-1,hy+2);L(g,n0,n1,m0,m1,Math.max(3,rd(4.5*z)),S.col)}
   ell(bx,by,brx,bry,S.col);ell(bx,by+bry*.45,brx*.78,bry*.45,S.belly);ell(bx+1,by-bry*.55,brx*.7,bry*.28,S.colL);
+  if(S.hump){ell(bx-1,by-bry*1.05,brx*.42,bry*.75,S.col);ell(bx-1,by-bry*1.3,brx*.3,bry*.3,S.colL)}
   leg(fx,legs[0],S.col,legs[0]>0?lift:0);leg(rx,legs[2],S.col,legs[2]<0?lift:0);
   if(S.mane){const[m0,m1]=T(hx-1.5,hy+1),mr=hr*1.75*z;for(let i=0;i<12;i++){const a=i/12*Math.PI*2;D(g,m0+Math.cos(a)*mr*.85,m1+Math.sin(a)*mr*.85,Math.max(2,rd(mr*.32)),S.mane)}D(g,m0,m1,rd(mr*.85),S.mane);D(g,m0+z,m1-z,rd(mr*.6),S.maneL)}
   const[h0,h1]=T(hx,hy),R0=rd(hr*z);
@@ -473,5 +487,21 @@ export function bgKeilah(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(53);
   for(let x=140;x<SW-200;x+=330+rd(rnd()*120)){const y=176+rd(rnd()*40);for(let dy=-7;dy<=7;dy++){const h=rd(46*Math.sqrt(1-(dy/7.5)**2));R(g,x-h,y+dy,h*2,1,dy===-7?'#d8cab0':'#b8a890')}
     for(const [ox,oy] of[[-14,-3],[8,-4],[-2,2]]){D(g,x+ox,y+oy-4,6,'#e2c060');D(g,x+ox,y+oy-6,4,'#f0d880');R(g,x+ox-1,y+oy-4,2,4,'#c09a40')}}
   for(let i=0;i<24*n;i++){const x=rd(rnd()*SW),y=rd(158+rnd()*94);R(g,x,y-4,1,4,'#d8b850');R(g,x+1,y-3,1,3,'#c8a840')}
+  return c}
+// Ziklag burned (smoke, blackened walls) → open desert → the Amalekite camp with striped tents (1 Sam 30).
+export function bgZiklag(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(67),camp=SW-1000;
+  sky(g,['#9a8a9a','#b8a0a0','#d8b4a0','#ecc8a0','#f4dcb0'],0,125,SW);
+  const far=x=>112-10*Math.sin(x*.006)-6*Math.sin(x*.021+2);
+  for(let x=0;x<SW;x++){const h=rd(far(x));R(g,x,h,1,150-h,'#c8a888')}
+  const mid=x=>134-6*Math.sin(x*.012+1)-3*Math.sin(x*.05);
+  for(let x=0;x<SW;x++){const h=rd(mid(x));R(g,x,h,1,150-h,'#d4b07a');R(g,x,h,1,1,'#e8c890')}
+  for(let x=30;x<600;x+=70+rd(rnd()*30)){const y=rd(mid(x))+4,w=30+rd(rnd()*20),h=14+rd(rnd()*14);R(g,x,y-h,w,h,'#5a4a40');R(g,x+3,y-h+3,w-6,3,'#3a2e28');for(let i=0;i<4;i++)R(g,x+rd(rnd()*w),y-h-rd(rnd()*4),3,2,'#2a2220');
+    for(let i=0;i<14;i++){const sx=x+w/2+Math.sin(i*.7)*4*i/4,sy=y-h-6-i*5;D(g,sx,sy,3+rd(i/4),i%2?'#8a8088':'#a8a0a4')}}
+  for(let x=camp;x<SW;x+=90+rd(rnd()*40)){const y=rd(mid(x))+6;for(let i=0;i<9;i++)R(g,x-i*2,y-9+i,i*4+1,1,i%2?'#c84a3a':'#e8dcc0');R(g,x-1,y-3,2,4,'#3a2a20')}
+  for(let y=148;y<270;y++)R(g,0,y,SW,1,y<149?'#a8885a':y<170?'#d0ac78':y<210?'#d8b682':'#e0be8a');
+  const n=SW/480;
+  for(let i=0;i<650*n;i++){const x=rnd()*SW,y=150+rnd()*110;R(g,x,y,1,1,rnd()<.5?'#b8966a':'#f0d8a8')}
+  for(let i=0;i<40;i++){const x=rnd()*560,y=158+rnd()*90;R(g,x,y,3,1,'#3a2e28');R(g,x+1,y-1,1,1,'#f08a3a')}
+  for(let i=0;i<10*n;i++){const x=rnd()*SW,y=160+rnd()*86;for(let j=0;j<9;j++)R(g,x+j*2,y-Math.round(Math.sin(j*.8)*2),2,1,'#c8a470')}
   return c}
 export{C,mk,ctx2,R,D,L,frame,bar};

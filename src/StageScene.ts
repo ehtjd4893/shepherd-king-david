@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import {
   frameOf, downOf, whiteOf, isBeast, shadowCanvas, sparkCanvas, stoneCanvas, pickupCanvas, sheepFrame, arrowCanvas, spearCanvas,
-  bgElah, bgField, bgGibeah, bgWild, bgKeilah, KB, frame, bar, R, D, C,
+  bgElah, bgField, bgGibeah, bgWild, bgKeilah, bgZiklag, KB, frame, bar, R, D, C,
 } from './art.ts';
 import {
-  hits, stepProg, spinCost, reaction, goliathDamage, brookShouldDrop, archerStep, swordify, seen, heard, suspicion, SIGHT_RANGE, SIGHT_RATE, HEAR_RATE, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
-  SPECIAL_DMG, FAITH_MAX, FAITH_PER_HIT, FAITH_PER_KO, STONE_MAX, type Attack, type Prog, type Spawn, type EnemyId, type EnemyDef, type Section, type Guard, type Goal,
+  hits, stepProg, spinCost, reaction, goliathDamage, brookShouldDrop, archerStep, swordify, camelPhase, chiefCalls, CAMEL_SPEED, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, SIGHT_RATE, HEAR_RATE, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
+  SPECIAL_DMG, FAITH_MAX, FAITH_PER_HIT, FAITH_PER_KO, STONE_MAX, type Attack, type Prog, type Spawn, type EnemyId, type EnemyDef, type Section, type Guard, type Goal, type Captive,
 } from './combat.ts';
 import { Controls } from './controls.ts';
 import { STAGES, type StageDef } from './stages.ts';
@@ -44,6 +44,8 @@ interface Rusher { id: string; x: number; y: number; hitSet: Set<Fighter>; spr: 
 /** One of Saul's men in a stealth section: patrols with a sight cone, or sleeps and only hears running. */
 interface Sentry { g: Guard; x: number; y: number; facing: 1 | -1; wait: number; meter: number; spr: Phaser.GameObjects.Image; mark: Phaser.GameObjects.Text }
 interface StealthRun { at: number; sentries: Sentry[]; goals: { g: Goal; done: boolean; marks: Phaser.GameObjects.GameObject[] }[]; grace: number; extras: Phaser.GameObjects.GameObject[] }
+/** A captive in the Amalekite camp, freed by walking up and pressing attack. */
+interface Bound { c: Captive; x: number; done: boolean; img: Phaser.GameObjects.Image; rope: Phaser.GameObjects.Graphics; arrow: Phaser.GameObjects.Text }
 interface Pickup { x: number; y: number; t: number; img: Phaser.GameObjects.Image; arrow: Phaser.GameObjects.Text }
 interface Sheep { i: number; x: number; y: number; facing: 1 | -1; moving: boolean; carrier: Fighter | null; img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }
 
@@ -69,6 +71,7 @@ export class StageScene extends Phaser.Scene {
   private rushers: Rusher[] = [];
   private allyCd = 0;
   private stealthRun: StealthRun | null = null;
+  private bound: Bound[] = [];
   private shade!: Phaser.GameObjects.Rectangle;
   private saulDodged = 0;
   private royalWarnAt = -9;
@@ -96,7 +99,7 @@ export class StageScene extends Phaser.Scene {
     this.stage = STAGES[this.stageId];
     this.enemies = []; this.stones = []; this.pickups = []; this.flock = [];
     this.ammo = this.stage.ammo ?? STONE_MAX; this.kos = 0; this.sheepLost = 0; this.hintsShown = 0;
-    this.quake = null; this.bubble = null; this.brookT = 0; this.shots = []; this.saulDodged = 0; this.royalWarnAt = -9; this.rushers = []; this.allyCd = 0; this.stealthRun = null;
+    this.quake = null; this.bubble = null; this.brookT = 0; this.shots = []; this.saulDodged = 0; this.royalWarnAt = -9; this.rushers = []; this.allyCd = 0; this.stealthRun = null; this.bound = [];
     this.spinRing = null;
     this.prog = { section: 0, wave: 0, locked: false, done: false };
     this.camX = this.hitstop = this.time0 = this.atkBuf = this.slingCd = 0;
@@ -107,7 +110,7 @@ export class StageScene extends Phaser.Scene {
 
     const once = (key: string, make: () => HTMLCanvasElement) => { if (!this.textures.exists(key)) this.textures.addCanvas(key, make()); };
     const bgKey = `bg_${this.stage.bg}`;
-    once(bgKey, () => ({ field: bgField, elah: bgElah, gibeah: bgGibeah, wild: bgWild, keilah: bgKeilah })[this.stage.bg](this.stage.width));
+    once(bgKey, () => ({ field: bgField, elah: bgElah, gibeah: bgGibeah, wild: bgWild, keilah: bgKeilah, ziklag: bgZiklag })[this.stage.bg](this.stage.width));
     once('stealthSpear', () => { const c = document.createElement('canvas'); c.width = 9; c.height = 60; const g = c.getContext('2d')!; g.fillStyle = '#1c1226'; g.fillRect(3, 6, 3, 54); g.fillStyle = '#7c4c2c'; g.fillRect(4, 7, 1, 52); g.fillStyle = '#9aa4ae'; g.fillRect(2, 0, 5, 8); return c; });
     once('jug', () => { const c = document.createElement('canvas'); c.width = 12; c.height = 14; const g = c.getContext('2d')!; g.fillStyle = '#1c1226'; g.fillRect(2, 3, 8, 11); g.fillRect(4, 0, 4, 4); g.fillStyle = '#b06a3a'; g.fillRect(3, 4, 6, 9); g.fillRect(5, 1, 2, 3); g.fillStyle = '#d8945a'; g.fillRect(4, 5, 1, 5); return c; });
     once('arrow', arrowCanvas);
@@ -176,6 +179,7 @@ export class StageScene extends Phaser.Scene {
       const left = this.enemies.filter(o => o.ai?.side === -1).length, right = this.enemies.length - left;
       e.ai = { mode: 'approach', wait: 0, side: left < right ? -1 : left > right ? 1 : (s.x < 240 ? -1 : 1), lane: Phaser.Math.Between(-5, 5), cd: 1.5 };
       if (kind === 'saul') { e.ai.wait = 2.2; e.ai.mode = 'ready'; } // a beat to read the tip before the first spear
+      if (kind === 'camel') { e.x = s.x < 240 ? this.camX - 50 : this.camX + 530; e.t = -0.8 * list.slice(0, list.indexOf(s)).filter(o => o.t === 'camel').length; }
       this.enemies.push(e);
       if (d.boss) {
         this.cameras.main.shake(500, 0.01);
@@ -265,7 +269,8 @@ export class StageScene extends Phaser.Scene {
   private applyHit(target: Fighter, a: Attack, dir: 1 | -1, heavyFx = false, src: 'staff' | 'stone' = 'staff') {
     if (target.g) { this.hitGoliath(target, a, dir, src); return; }
     target.hp -= a.dmg;
-    const heavy = a.knock || heavyFx;
+    if (target.kind === 'chief') { const n = chiefCalls(target.hp + a.dmg, target.hp); if (n && target.hp > 0) this.callCamels(n * 2); }
+    const heavy = a.knock || heavyFx || target.kind === 'camel';
     const boss = !!(target.kind && this.def(target).boss);
     const r = reaction(boss, heavy, target.hp <= 0);
     this.hitstop = Math.max(this.hitstop, r === 'down' ? 0.11 : 0.055);
@@ -473,6 +478,56 @@ export class StageScene extends Phaser.Scene {
       this.applyHit(e, { ...COMBO[2], dmg: SPECIAL_DMG }, e.x >= p.x ? 1 : -1, true);
     }
     this.hitstop = 0.2;
+  }
+
+  /* ---------- Ziklag: camel riders, captives (1 Sam 30) ---------- */
+  private callCamels(n: number) {
+    this.spawn(Array.from({ length: n }, (_, i) => ({ x: i % 2 ? -40 : 520, y: 210, t: 'camel' as const })));
+    this.pop('낙타 기병이다!', this.camX + 240, 90, true);
+  }
+
+  /** Waits off-screen, then (warning line on David's lane) gallops across and leaves. */
+  private updateCamel(e: Fighter, dt: number) {
+    const p = this.player;
+    if (e.t < 0) return;
+    if (e.lane === undefined) e.lane = p.y;
+    e.y = e.lane;
+    if (camelPhase(e.t) === 'warn') { e.state = 'idle'; return; }
+    e.state = 'walk';
+    e.x += e.facing * CAMEL_SPEED * dt;
+    const a = this.def(e).attack;
+    if (!e.hitSet.has(p) && p.inv <= 0 && p.state !== 'down' && p.state !== 'dead' && hits(e, a.box, { x: p.x, y: p.y, z: p.z, hw: 6 })) {
+      e.hitSet.add(p); this.applyHit(p, a, e.facing);
+    }
+    if ((e.facing > 0 && e.x > this.camX + 540) || (e.facing < 0 && e.x < this.camX - 60)) { e.spr.destroy(); e.shadow.destroy(); e.gone = true; }
+  }
+
+  private setupCaptives(sec: Section) {
+    this.bound = sec.captives!.map(c => {
+      const x = sec.at + c.x, key = this.tex(c.who, 'tied', 0), o = this.origins.get(key)!;
+      const rope = this.add.graphics().setDepth(c.y + 11);
+      rope.lineStyle(2, 0x8a6a40, 1).lineBetween(x - 9, c.y - 24, x + 9, c.y - 14).lineBetween(x - 9, c.y - 14, x + 9, c.y - 24);
+      return {
+        c, x, done: false, rope,
+        img: this.add.image(x, c.y, key).setOrigin(o[0], o[1]).setDepth(c.y + 10),
+        arrow: this.add.text(x, c.y - 44, '▼', { fontFamily: FONT, fontSize: '11px', color: '#ffe27a', stroke: '#7a2416', strokeThickness: 2 }).setOrigin(0.5, 1).setDepth(961),
+      };
+    });
+  }
+
+  private updateCaptives(T: number) {
+    const p = this.player;
+    for (const b of this.bound) {
+      if (b.done) continue;
+      b.arrow.setY(b.c.y - 44 - Math.abs(Math.sin(T * 6)) * 4);
+      if (!this.ctl.attack || Math.abs(b.x - p.x) > 22 || Math.abs(b.c.y - p.y) > 14) continue;
+      b.done = true; b.rope.destroy(); b.arrow.destroy();
+      const key = this.tex(b.c.who, 'idle', 0), o = this.origins.get(key)!;
+      b.img.setTexture(key).setOrigin(o[0], o[1]);
+      this.say(b.c.who === 'child' ? '다윗 아저씨!' : '고마워요!', b.x, b.c.y - 50);
+      sfx.harp();
+      this.tweens.add({ targets: b.img, x: b.x - 260, duration: 1600, onComplete: () => b.img.destroy() }); // runs back toward Ziklag
+    }
   }
 
   /* ---------- Stealth: En-gedi cave, Ziph camp (1 Sam 24, 26) ---------- */
@@ -848,6 +903,10 @@ export class StageScene extends Phaser.Scene {
         const x0 = e.x + e.facing * 20;
         this.fxg.fillStyle(0xe63c3c, 0.45).fillRect(e.facing > 0 ? x0 : x0 - 260, e.y - 6, 260, 12);
       }
+      if (e.kind === 'camel' && e.t >= 0 && e.t < CAMEL_WARN && e.lane !== undefined && Math.floor(T * 12) % 2) {
+        this.fxg.fillStyle(0xe63c3c, 0.45).fillRect(this.camX, e.lane - 7, 480, 14);
+        for (let i = 0; i < 8; i++) { const cx = this.camX + (e.facing > 0 ? 30 + i * 56 : 450 - i * 56); this.fxg.fillStyle(0xffd0c8, 1).fillTriangle(cx, e.lane - 4, cx, e.lane + 4, cx + e.facing * 7, e.lane); }
+      }
       if (e.stun && e.state !== 'down') {
         const k = KB * (d.scale ?? 1), hy = e.y - (isBeast(e.id) ? 30 : 50) * k;
         for (let i = 0; i < 3; i++) { const a = T * 5 + i * 2.1; this.topfx.fillStyle(0xffe27a, 1).fillRect(Math.round(e.x + Math.cos(a) * 9) - 1, Math.round(hy + Math.sin(a) * 2.5), 3, 1).fillRect(Math.round(e.x + Math.cos(a) * 9), Math.round(hy + Math.sin(a) * 2.5) - 1, 1, 3); }
@@ -926,6 +985,7 @@ export class StageScene extends Phaser.Scene {
     if (e.state === 'getup') { if (e.t > 0.25) { e.state = 'idle'; ai.mode = 'approach'; } return; }
     if (e.stun) { e.stun = Math.max(0, e.stun - dt); e.state = 'idle'; return; } // soothed by the harp
     if (d.ai === 'archer') { this.updateArcher(e, dt); return; }
+    if (d.ai === 'camel') { this.updateCamel(e, dt); return; }
 
     if (d.ai === 'thief' && !e.fights && this.thiefSteal(e, dt)) return;
 
@@ -1157,13 +1217,15 @@ export class StageScene extends Phaser.Scene {
       this.showHint();
 
       this.updateStealth(dt, T);
-      const goalsLeft = this.stealthRun ? this.stealthRun.goals.filter(g => !g.done).length : 0;
+      this.updateCaptives(T);
+      const goalsLeft = (this.stealthRun ? this.stealthRun.goals.filter(g => !g.done).length : 0) + this.bound.filter(b => !b.done).length;
       const r = stepProg(this.prog, this.stage.sections, this.player.x, this.enemies.length + goalsLeft);
       this.prog = r.p;
       if (r.spawn) {
         this.spawn(r.spawn);
         const sec = this.stage.sections[this.prog.section];
         if (sec.stealth && this.prog.wave === 0) this.setupStealth(sec);
+        if (sec.captives && this.prog.wave === 0) this.setupCaptives(sec);
       }
     }
     this.updateFlock(dt, T);

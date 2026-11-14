@@ -5,7 +5,7 @@ export type Next = { scene: 'cutscene'; id: string } | { scene: 'title' };
 /** On-screen tip shown once when David passes world x `at`. */
 export interface Hint { at: number; pc: string; touch: string }
 export interface StageDef {
-  title: string; width: number; bg: 'field' | 'elah' | 'gibeah' | 'wild' | 'keilah'; sheep: number; sections: Section[]; hints: Hint[]; next: Next;
+  title: string; width: number; bg: 'field' | 'elah' | 'gibeah' | 'wild' | 'keilah' | 'ziklag'; sheep: number; sections: Section[]; hints: Hint[]; next: Next;
   /** David's start x (default 60); stones he starts with (default 5); brook = stones wash up while he's short */
   start?: number; ammo?: number; brook?: boolean;
   /** the faith special becomes the harp (from stage 3) */
@@ -165,5 +165,34 @@ export const STAGES: Record<string, StageDef> = {
       },
     ],
     next: { scene: 'cutscene', id: 'spare' },
+  },
+  ziklag: {
+    title: 'STAGE 6 · 시글락',
+    width: 2400,
+    bg: 'ziklag',
+    sheep: 0,
+    harp: true,
+    sword: true,
+    allies: true,
+    hints: [
+      { at: 0, pc: '낙타 기병! 붉은 선이 깔리면 그 줄을 비키세요', touch: '낙타 기병! 붉은 선이 깔리면 그 줄을 비키세요' },
+      { at: 1280, pc: '아말렉 진영이다. 포로들 곁에서 Z를 눌러 밧줄을 풀어 주세요', touch: '아말렉 진영이다. 포로들 곁에서 공격 버튼을 눌러 밧줄을 풀어 주세요' },
+      { at: 1920, pc: '아말렉 대장! 지치면 낙타 기병을 부른다', touch: '아말렉 대장! 지치면 낙타 기병을 부른다' },
+    ],
+    sections: [
+      { at: 0, waves: [[{ x: 520, y: 200, t: 'amalek' }, { x: 540, y: 232, t: 'amalek' }, { x: -40, y: 210, t: 'camel' }]] },
+      {
+        at: 640, waves: [
+          [{ x: 520, y: 196, t: 'amalek' }, { x: -40, y: 226, t: 'amalek' }, { x: 540, y: 210, t: 'camel' }, { x: -40, y: 210, t: 'camel' }],
+          [{ x: 520, y: 236, t: 'amalek' }, { x: 560, y: 190, t: 'amalek' }, { x: -40, y: 214, t: 'amalek' }, { x: 540, y: 210, t: 'camel' }],
+        ],
+      },
+      {
+        at: 1280, waves: [[{ x: 520, y: 200, t: 'amalek' }, { x: -40, y: 230, t: 'amalek' }, { x: 560, y: 214, t: 'camel' }]],
+        captives: [{ x: 300, y: 196, who: 'villager' }, { x: 350, y: 226, who: 'child' }, { x: 400, y: 204, who: 'villager' }, { x: 250, y: 238, who: 'child' }],
+      },
+      { at: 1920, waves: [[{ x: 520, y: 210, t: 'chief' }, { x: -40, y: 196, t: 'amalek' }]] },
+    ],
+    next: { scene: 'cutscene', id: 'gilboa' },
   },
 };

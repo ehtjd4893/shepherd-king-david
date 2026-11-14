@@ -4,10 +4,11 @@
 export interface Actor { id: string; x: number; y: number; anim?: string; flip?: boolean; from?: number; k?: number; down?: boolean }
 /** One line. `actors` replaces who is on stage (omit to keep the previous set). */
 /** qte = presses needed (mash the attack button; can't fail); banner = big gold line that pops up (item get). */
-export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint'; qte?: number; banner?: string }
-export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'wild' | 'dark'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } }
+/** bg switches the backdrop from this line on; fx 'gilboa' = dark mountain with Saul's crown and Jonathan's bow falling (1 Sam 31). */
+export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint' | 'gilboa'; qte?: number; banner?: string; bg?: Cutscene['bg'] }
+export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'wild' | 'ziklag' | 'dark'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } }
 
-export const NAMES = { samuel: '사무엘', saul: '사울', jesse: '이새', david: '다윗', goliath: '골리앗', jonathan: '요나단', michal: '미갈', priest: '아히멜렉', achish: '아기스 왕' } as const;
+export const NAMES = { samuel: '사무엘', saul: '사울', jesse: '이새', david: '다윗', goliath: '골리앗', jonathan: '요나단', michal: '미갈', priest: '아히멜렉', achish: '아기스 왕', egypt: '이집트 소년' } as const;
 
 const SAMUEL = { id: 'samuel', x: 176, y: 192 };
 const SAUL = { id: 'saul', x: 292, y: 194, flip: true };
@@ -116,6 +117,31 @@ export const CUTSCENES: Record<string, Cutscene> = {
     ],
     next: { scene: 'stage', id: 'keilah' },
   },
+  ziklag: {
+    bg: 'ziklag',
+    beats: [
+      { text: '다윗과 사람들이 시글락에 돌아와 보니, 아말렉이 성을 불사르고 아내와 자녀들을 모두 사로잡아 갔다. (삼상 30:1-3)', actors: [{ id: 'davidS', x: 200, y: 190 }, { id: 'ally1', x: 250, y: 186 }, { id: 'ally3', x: 290, y: 190 }] },
+      { text: '사람들은 울 기운이 없을 때까지 울었고, 다윗을 돌로 치자는 말까지 나왔다. (삼상 30:4-6)' },
+      { text: '그러나 다윗은 그의 하나님 여호와를 힘입고 용기를 얻었다. (삼상 30:6)' },
+      { who: 'david', text: '여호와께서 쫓아가라고 하셨다. 반드시 따라잡고, 모두 되찾을 것이다! (삼상 30:8)' },
+      { text: '브솔 시내에 이르자 너무 지친 이백 명은 그곳에 남았다. 다윗은 사백 명과 함께 계속 쫓아갔다. (삼상 30:9-10)', actors: [{ id: 'davidS', x: 200, y: 190 }, { id: 'ally2', x: 250, y: 186 }] },
+      { who: 'egypt', text: '먹을 것을 주셔서 고맙습니다… 제 주인이 아말렉 사람인데, 진영으로 가는 길을 알려 드릴게요! (삼상 30:11-15)', actors: [{ id: 'davidS', x: 200, y: 190 }, { id: 'egypt', x: 270, y: 188, flip: true }] },
+    ],
+    next: { scene: 'stage', id: 'ziklag' },
+  },
+  gilboa: {
+    bg: 'ziklag',
+    beats: [
+      { text: '다윗은 아말렉이 빼앗아 간 모든 것을 되찾았다. 작은 것 하나 잃은 것이 없었다. (삼상 30:18-19)', actors: [{ id: 'davidS', x: 200, y: 190 }, { id: 'villager', x: 260, y: 186, flip: true }, { id: 'child', x: 300, y: 190, flip: true }] },
+      { who: 'david', text: '싸우러 나간 사람의 몫이나, 짐 곁에 남은 사람의 몫이나 똑같아야 한다! (삼상 30:24)' },
+      { text: '그 무렵, 길보아 산에서 블레셋과 이스라엘의 큰 싸움이 있었다. (삼상 31:1)', bg: 'dark', fx: 'gilboa', actors: [] },
+      { text: '그날 사울과 요나단은 함께 전사했다. 산 위에는 왕관과 활만이 남았다. (삼상 31:6, 삼하 1:10)' },
+      { text: '소식을 들은 다윗은 옷을 찢고, 저녁이 될 때까지 울며 금식했다. (삼하 1:11-12)', bg: 'wild', actors: [{ id: 'davidS', x: 230, y: 190, anim: 'kneel' }] },
+      { who: 'david', text: '이스라엘아, 어찌하여 용사들이 엎드러졌는가! 사울과 요나단은 살아 있을 때 사랑스럽고 아름다웠으니… (삼하 1:19, 23)' },
+      { who: 'david', text: '내 형 요나단이여, 그대 때문에 내 마음이 아프오. 그대는 내게 참으로 귀한 사람이었소. (삼하 1:26)' },
+    ],
+    next: { scene: 'title' }, // TODO(stage 7): → hebron
+  },
   spare: {
     bg: 'wild',
     beats: [
@@ -127,7 +153,7 @@ export const CUTSCENES: Record<string, Cutscene> = {
       { who: 'saul', text: '내 아들 다윗아, 네게 복이 있기를 바란다. 네가 큰일을 하겠고, 반드시 이기리라. (삼상 26:25)' },
       { text: '그래도 다윗은 사울을 피해 블레셋 땅으로 가서, 시글락 성읍에 머물게 되었다. (삼상 27:1-6)', actors: [] },
     ],
-    next: { scene: 'title' }, // TODO(stage 6): → ziklag
+    next: { scene: 'cutscene', id: 'ziklag' },
   },
   keilahAfter: {
     bg: 'wild',

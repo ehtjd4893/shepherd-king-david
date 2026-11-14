@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hits, stepProg, seen, heard, suspicion, SIGHT_RANGE, HEAR_RANGE, HEAR_RATE, swordify, COMBO, SWORD_REACH, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP, type Prog, type Section } from './combat.ts';
+import { hits, stepProg, camelPhase, chiefCalls, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, HEAR_RANGE, HEAR_RATE, swordify, COMBO, SWORD_REACH, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP, type Prog, type Section } from './combat.ts';
 
 test('spin spends faith first, then a little health, never the last of it', () => {
   assert.deepEqual(spinCost(SPIN_FAITH, 50), { faith: 0, hp: 50 });
@@ -140,4 +140,17 @@ test('running straight past a sleeper wakes him', () => {
   const frames = Math.floor((2 * HEAR_RANGE / 220) * 60);
   for (let i = 0; i < frames; i++) m = suspicion(m, true, 1 / 60, HEAR_RATE);
   assert.equal(m, 1);
+});
+
+test('camel riders warn before they gallop', () => {
+  assert.equal(camelPhase(0), 'warn');
+  assert.equal(camelPhase(CAMEL_WARN - 0.01), 'warn');
+  assert.equal(camelPhase(CAMEL_WARN), 'charge');
+});
+
+test('the Amalekite chief calls riders once per threshold crossed', () => {
+  assert.equal(chiefCalls(180, 150), 0);
+  assert.equal(chiefCalls(125, 115), 1);
+  assert.equal(chiefCalls(125, 50), 2); // a big hit past both
+  assert.equal(chiefCalls(115, 100), 0); // already called
 });
