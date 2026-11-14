@@ -206,6 +206,7 @@ const POSE={
     case 'hurt':return{lean:-3,hy:-1,fF:[2,0],fB:[-7,0],hF:[-2,-22],hB:[-8,-20],item:'staff',ia:-2.0,mouth:1,flow:.1};
     case 'jump':return{bob:-2,fF:[5,-5],fB:[-3,-4],hF:[8,-24],hB:[-6,-22],item:'staff',ia:-.6,flow:1,wave:-1};
     case 'harp':return{bob:b,hF:[6+b*1.5,-24+b],hB:[3,-15],harp:1,flow:.3+b*.1,wave:b};
+    case 'climb':return{hF:[5,-37+b*3],hB:[-4,-33-b*3],kF:[5,-9+b*2],fF:[4,-3+b*2],kB:[-2,-10-b*2],fB:[-4,-4-b*2],staffBack:1,flow:.15,hy:-1};
     case 'kneel':return{bob:6,kF:[8,-7],fF:[8,0],kB:[0,-1],fB:[-7,-1],hF:[6,-9],hB:[4,-8],hy:1,hx:1,flow:0};
     default:return{bob:b,fF:[5,0],fB:[-5,0],hF:[7,-14+b],hB:[-5,-14+b],item:'staff',ia:-1.2,flow:.25+b*.08,wave:b}}},
   soldier(a,f,S){if(S.weapon==='bow'&&(a==='atkA'||a==='atk'))return a==='atkA'?{lean:-1,fF:[5,0],fB:[-5,0],hF:[12,-21],hB:[1,-21],item:'bow',draw:1}:{lean:1,fF:[5,0],fB:[-5,0],hF:[12,-21],hB:[-4,-19],item:'bow',mouth:1};
@@ -259,6 +260,11 @@ CAST.camel={beast:1,size:1.6,wu:56,hu:52,body:[-2,-21,12,6.5],head:[15,-34,3.6],
 CAST.villager={skin:C.skin,skinD:C.skinD,hair:C.dark,hairStyle:'hood',hood:'#5a8ab0',tunic:'#e8d8b8',tunicD:'#b8a888',tunicL:'#fff0d8',sash:'#5a8ab0',robe:1,blush:'#e3806a',leg:C.skin,legD:C.skinD,shoe:C.wood,pose:'bro',wu:40};
 CAST.child={...CAST.villager,hairStyle:'curly',hair:C.dark,hairL:'#5a4030',tunic:'#c8a060',tunicD:'#9a7a48',tunicL:'#e0c080',robe:0,tall:.72};
 CAST.egypt={skin:'#a8704a',skinD:'#7a4e30',hair:'#1c1226',hairStyle:'king',tunic:'#f2eee2',tunicD:'#c8c0aa',tunicL:'#ffffff',sash:C.gold,leg:'#a8704a',legD:'#7a4e30',shoe:C.woodD,pose:'bro',wu:40,tall:.9};
+CAST.davidK={...CAST.davidS,crown:1,cape:C.purple,capeD:C.purpleD,capeL:C.purpleL,band:C.gold};
+CAST.elder={...CAST.jesse,tunic:C.indigo,tunicD:C.indigoD,tunicL:C.indigoL,sash:C.gold};
+CAST.jebusite={skin:C.skinP,skinD:C.skinPD,hair:C.dark,hairStyle:'helmet',beard:C.beard,beardD:C.beardD,beardLen:3,browC:C.out,tunic:'#4a6a6a',tunicD:'#2e4848',tunicL:'#6a8a88',sash:C.bronzeD,armor:'bands',armorC:C.bronze,armorD:C.bronzeD,leg:C.skinP,legD:C.skinPD,shoe:C.woodD,pose:'soldier',weapon:'spear',spearLen:20,wu:96};
+CAST.jebArcher={...CAST.jebusite,armor:null,tunic:'#6a7a5a',tunicD:'#4a5a3e',tunicL:'#8a9a78',weapon:'bow',wu:80};
+CAST.lord={...CAST.jebusite,armor:'scale',armorC:C.gold,armorD:C.goldD,trim:C.gold,sash:C.gold,shield:1,crown:1,tunic:'#2e4848',tunicD:'#1a2e2e',tunicL:'#4a6a6a',spearLen:26,wu:110};
 CAST.jonathan={skin:C.skin,skinD:C.skinD,hair:C.dark,hairStyle:'king',tunic:C.blue,tunicD:C.blueD,tunicL:C.blueL,sash:C.gold,trim:C.gold,leg:C.skin,legD:C.skinD,shoe:C.wood,pose:'bro',wu:40,tall:1.06};
 CAST.thief={skin:C.skinP,skinD:C.skinPD,hair:C.dark,hairStyle:'hood',hood:'#7a5a3c',tunic:'#5c4433',tunicD:'#3e2c20',tunicL:'#7a5c44',sash:C.oatD,fringe:1,beard:C.beard,beardD:C.beardD,beardLen:3,leg:C.skinP,legD:C.skinPD,shoe:C.woodD,pose:'soldier',weapon:'club',wu:80};
 CAST.raider={...CAST.thief,hood:'#8a3a30',tunic:'#a8865a',tunicD:'#7a5e3e',tunicL:'#c8a676',sash:C.kiltD};
@@ -503,5 +509,43 @@ export function bgZiklag(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(67),camp=SW
   for(let i=0;i<650*n;i++){const x=rnd()*SW,y=150+rnd()*110;R(g,x,y,1,1,rnd()<.5?'#b8966a':'#f0d8a8')}
   for(let i=0;i<40;i++){const x=rnd()*560,y=158+rnd()*90;R(g,x,y,3,1,'#3a2e28');R(g,x+1,y-1,1,1,'#f08a3a')}
   for(let i=0;i<10*n;i++){const x=rnd()*SW,y=160+rnd()*86;for(let j=0;j<9;j++)R(g,x+j*2,y-Math.round(Math.sin(j*.8)*2),2,1,'#c8a470')}
+  return c}
+// Below Jebus: olive slopes climbing to the city walls on the ridge (2 Sam 5:6).
+export function bgJebus(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(71);
+  sky(g,['#6aa0cc','#86b4d8','#a6c8de','#c8dce0','#e6e6d4'],0,125,SW);
+  for(let x=70;x<SW;x+=220+rd(rnd()*160))cloud(g,x,18+rnd()*30,.8+rnd()*.5);
+  const ridge=x=>112-8*Math.sin(x*.005)-4*Math.sin(x*.02);
+  for(let x=0;x<SW;x++){const h=rd(ridge(x));R(g,x,h,1,150-h,'#b09878')}
+  // city wall with towers and gate along the ridge
+  for(let x=0;x<SW;x++){const top=rd(ridge(x))-26;R(g,x,top,1,26,(x%24)<1?'#9a8262':'#c8b090');if(x%8<5)R(g,x,top-4,1,4,'#c8b090')}
+  for(let x=60;x<SW;x+=180){const top=rd(ridge(x))-44;R(g,x,top,22,44,'#b8a080');for(let i=0;i<22;i+=6)R(g,x+i,top-4,4,4,'#b8a080');R(g,x+8,top+12,6,8,'#3a2e28')}
+  const mid=x=>136-6*Math.sin(x*.011+1)-2*Math.sin(x*.06);
+  for(let x=0;x<SW;x++){const h=rd(mid(x));R(g,x,h,1,150-h,'#8a9a5a');R(g,x,h,1,1,'#a8b86a')}
+  for(let x=30;x<SW;x+=60+rd(rnd()*90)){const y=rd(mid(x))+3;L(g,x,y,x-1,y-7,2,'#4a3a2c');D(g,x,y-10,5,'#6f7a52');D(g,x+4,y-8,3,'#6f7a52');D(g,x+1,y-12,2,'#8f9a6a')}
+  for(let y=148;y<270;y++)R(g,0,y,SW,1,y<149?'#7a7a48':y<170?'#a8a066':y<210?'#b0a86e':'#b8b076');
+  const n=SW/480;
+  for(let i=0;i<700*n;i++){const x=rnd()*SW,y=150+rnd()*110;R(g,x,y,1,1,rnd()<.5?'#98904e':'#ccc488')}
+  for(let i=0;i<26*n;i++){const x=rnd()*SW,y=158+rnd()*92,r=1+rd(rnd()*1.5);D(g,x,y,r+1,'#7a7262');D(g,x,y-1,r,'#b8b09a')}
+  return c}
+// Inside the fortress of Zion: pale stone court, the citadel tower, banners.
+export function bgZion(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(79);
+  sky(g,['#5a90c0','#78a8d0','#98bcd8','#bcd2dc','#dcdcd0'],0,90,SW);
+  R(g,0,60,SW,92,'#c8b494');for(let y=66;y<152;y+=8){R(g,0,y,SW,1,'#a8946e');for(let x=(y/8)%2?0:10;x<SW;x+=20)R(g,x,y-8,1,8,'#a8946e')}
+  for(let x=0;x<SW;x+=10)R(g,x,54,6,6,'#c8b494');
+  for(let x=120;x<SW;x+=360){R(g,x,20,60,132,'#bca684');for(let i=0;i<60;i+=10)R(g,x+i,14,6,6,'#bca684');R(g,x+24,40,12,18,'#3a2e28');R(g,x+24,90,12,18,'#3a2e28');
+    R(g,x+29,0,2,20,'#5a3a26');R(g,x+31,2,14,8,'#2e7d86');R(g,x+31,4,14,1,C.gold)}
+  for(let y=152;y<270;y++)R(g,0,y,SW,1,y<153?'#8a7a62':'#bcae94');
+  for(let y=164;y<270;y+=14)R(g,0,y,SW,1,'#a49478');
+  for(let y=152,r=0;y<270;y+=14,r++)for(let x=r%2?0:22;x<SW;x+=44)R(g,x,y,1,14,'#a49478');
+  for(let i=0;i<300*SW/480;i++)R(g,rnd()*SW,154+rnd()*114,1,1,'#ccc0a8');
+  return c}
+// The water shaft (2 Sam 5:8): a tall rock chimney, water at the bottom, daylight at the top. Width 480.
+export function shaftCanvas(H){const c=mk(480,H),g=ctx2(c),rnd=seeded(83);
+  R(g,0,0,480,H,'#2a2420');
+  for(let y=0;y<H;y+=10)for(let x=(y/10)%2?0:14;x<480;x+=28){const v=rnd();R(g,x,y,27,9,v<.3?'#4a3e36':v<.7?'#3e342e':'#54463c');R(g,x,y,27,1,'#5e5044')}
+  R(g,150,0,180,H,'#1c1612');for(let y=0;y<H;y+=6)R(g,150+rd(Math.sin(y*.05)*3),y,4,6,'#3e342e'),R(g,326+rd(Math.cos(y*.05)*3),y,4,6,'#3e342e');
+  for(let y=0;y<60;y++)R(g,150,y,180,1,`rgba(255,240,200,${(.5-y/120).toFixed(3)})`);
+  R(g,150,H-30,180,30,'#2a5a78');for(let i=0;i<20;i++)R(g,150+rnd()*170,H-28+rnd()*24,6,1,'#5a9ab8');
+  for(let i=0;i<40;i++){const y=rnd()*H;R(g,150+rd(rnd()*180),y,2,2,'#5a4a3e')}
   return c}
 export{C,mk,ctx2,R,D,L,frame,bar};

@@ -98,3 +98,20 @@ export function readCutscene(maxBeats = 30) {
   }
   return { seen, now: scenes() };
 }
+
+/** Climb the water shaft: hold up, step out of any warned column. */
+export function climb(seconds = 90) {
+  const sc = window.game.scene.getScene('shaft');
+  let f = 0, slides = 0, lastY = sc.y;
+  for (; f < 60 * seconds && scenes() === 'shaft' && sc.doneAt < 0; f++) {
+    const danger = sc.rocks.some(r => Math.abs(r.x - sc.x) < 20 && (r.t < 0 || r.y < sc.y));
+    const free = [196, 240, 284].filter(x => !sc.rocks.some(r => Math.abs(r.x - x) < 20 && (r.t < 0 || r.y < sc.y)));
+    const target = danger && free.length ? free.reduce((a, b) => (Math.abs(a - sc.x) < Math.abs(b - sc.x) ? a : b)) : sc.x;
+    hold('ArrowUp', !danger); hold('ArrowLeft', target < sc.x - 3); hold('ArrowRight', target > sc.x + 3);
+    run(1);
+    if (sc.y > lastY + 30) slides++; lastY = sc.y;
+  }
+  ['ArrowUp', 'ArrowLeft', 'ArrowRight'].forEach(k => hold(k, false));
+  run(120);
+  return { seconds: (f / 60).toFixed(1), slides, now: scenes() };
+}

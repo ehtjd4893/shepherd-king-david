@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { TitleScene } from './TitleScene.ts';
 import { CutsceneScene } from './CutsceneScene.ts';
 import { StageScene } from './StageScene.ts';
+import { ShaftScene } from './ShaftScene.ts';
+import { CreditsScene } from './CreditsScene.ts';
 
 // Wait briefly for the Korean UI font so HUD text doesn't render in a fallback face first.
 await Promise.race([document.fonts.load('10px "Do Hyeon"'), new Promise(r => setTimeout(r, 1500))]).catch(() => {});
@@ -16,6 +18,6 @@ const game = new Phaser.Game({
   roundPixels: true,
   input: { gamepad: true },
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [TitleScene, CutsceneScene, StageScene],
+  scene: [TitleScene, CutsceneScene, StageScene, ShaftScene, CreditsScene],
 });
 if (import.meta.env.DEV) Object.assign(window, { game }); // dev-only handle for poking at state from the console

@@ -61,6 +61,9 @@ const CAMEL_CHARGE: Attack = { pose: 'walk', dur: 99, active: [0, 99], box: { fr
 /** Amalekite chief: a wide sweep that catches both sides, and a charge down the lane. */
 const CHIEF_SWEEP: Attack = { pose: 'atk', dur: 0.55, active: [0.32, 0.4], box: { from: -30, to: 50, height: 40 }, dmg: 14, knock: false, lunge: 60 };
 const CHIEF_CHARGE: Attack = { pose: 'atk', dur: 0.9, active: [0.45, 0.85], box: { from: -4, to: 40, height: 40 }, dmg: 14, knock: true, lunge: 240, keep: true };
+/** Jebusite lord: a long spear thrust and a shield charge down the lane. */
+const LORD_THRUST: Attack = { pose: 'atk', dur: 0.55, active: [0.32, 0.42], box: { from: 0, to: 64, height: 40 }, dmg: 14, knock: false, lunge: 160 };
+const LORD_CHARGE: Attack = { pose: 'atk', dur: 0.9, active: [0.45, 0.85], box: { from: -4, to: 44, height: 44 }, dmg: 16, knock: true, lunge: 240, keep: true };
 const ARROW_SHOT: Attack = { pose: 'atk', dur: 0.8, active: [0.6, 0.6], box: { from: 0, to: 0, height: 0 }, dmg: 8, knock: false, lunge: 0 };
 /** Saul: raise the spear over the lane for a moment, then hurl it. */
 const SAUL_THROW: Attack = { pose: 'throw', dur: 1.1, active: [0.8, 0.8], box: { from: 0, to: 0, height: 0 }, dmg: 22, knock: true, lunge: 0 };
@@ -86,6 +89,9 @@ export const ENEMIES = {
   amalek: { name: '아말렉 병사', hp: 34, speed: 100, reach: 36, hw: 6, attack: SCIMITAR, ai: 'soldier' },
   camel: { name: '낙타 기병', hp: 20, speed: 0, reach: 0, hw: 14, attack: CAMEL_CHARGE, ai: 'camel' },
   chief: { name: '아말렉 대장', hp: 180, speed: 95, reach: 40, hw: 9, attack: CHIEF_SWEEP, ai: 'soldier', boss: true, scale: 1.35, special: { attack: CHIEF_CHARGE, from: 90, to: 240, every: 3.2 } },
+  jebusite: { name: '여부스 병사', hp: 36, speed: 90, reach: 60, hw: 6, attack: SOLDIER_THRUST, ai: 'soldier' },
+  jebArcher: { name: '여부스 궁수', hp: 26, speed: 80, reach: 150, hw: 6, attack: ARROW_SHOT, ai: 'archer' },
+  lord: { name: '여부스 성주', hp: 200, speed: 80, reach: 56, hw: 9, attack: LORD_THRUST, ai: 'soldier', boss: true, scale: 1.4, special: { attack: LORD_CHARGE, from: 100, to: 260, every: 3 } },
   philC: { name: '방패병', hp: 44, speed: 70, reach: 34, hw: 6, attack: SOLDIER_SLASH, ai: 'soldier' },
   goliath: { name: '골리앗', hp: 100, speed: 34, reach: 90, hw: 22, attack: SOLDIER_THRUST, ai: 'goliath', boss: true, scale: 1.6 },
   lion: { name: '사자', hp: 200, speed: 120, reach: 42, hw: 15, attack: LION_CLAW, ai: 'soldier', boss: true, special: { attack: LION_POUNCE, from: 80, to: 180, every: 2.4 } },
@@ -209,3 +215,12 @@ export const CHIEF_CALLS = [120, 60];
 export function chiefCalls(before: number, after: number): number {
   return CHIEF_CALLS.filter(h => before > h && after <= h).length;
 }
+
+// ---------- The water shaft into Jebus (2 Sam 5:8) ----------
+/** Climb a tall rock chimney while stones drop down one of three columns (each warned first). A hit slides David down; no one dies in the shaft. */
+export const SHAFT = { height: 900, top: 60, climb: 72, side: 80, rockSpeed: 250, warn: 0.75, every: 1.0, slide: 70 };
+export const SHAFT_COLUMNS = [196, 240, 284];
+export function rockHits(rock: { x: number; y: number }, d: { x: number; y: number }): boolean {
+  return Math.abs(rock.x - d.x) < 16 && rock.y > d.y - 42 && rock.y < d.y + 4;
+}
+export function slideDown(y: number, bottom: number): number { return Math.min(bottom, y + SHAFT.slide); }

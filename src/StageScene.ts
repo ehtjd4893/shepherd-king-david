@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {
   frameOf, downOf, whiteOf, isBeast, shadowCanvas, sparkCanvas, stoneCanvas, pickupCanvas, sheepFrame, arrowCanvas, spearCanvas,
-  bgElah, bgField, bgGibeah, bgWild, bgKeilah, bgZiklag, KB, frame, bar, R, D, C,
+  bgElah, bgField, bgGibeah, bgWild, bgKeilah, bgZiklag, bgJebus, bgZion, KB, frame, bar, R, D, C,
 } from './art.ts';
 import {
   hits, stepProg, spinCost, reaction, goliathDamage, brookShouldDrop, archerStep, swordify, camelPhase, chiefCalls, CAMEL_SPEED, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, SIGHT_RATE, HEAR_RATE, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
@@ -110,7 +110,7 @@ export class StageScene extends Phaser.Scene {
 
     const once = (key: string, make: () => HTMLCanvasElement) => { if (!this.textures.exists(key)) this.textures.addCanvas(key, make()); };
     const bgKey = `bg_${this.stage.bg}`;
-    once(bgKey, () => ({ field: bgField, elah: bgElah, gibeah: bgGibeah, wild: bgWild, keilah: bgKeilah, ziklag: bgZiklag })[this.stage.bg](this.stage.width));
+    once(bgKey, () => ({ field: bgField, elah: bgElah, gibeah: bgGibeah, wild: bgWild, keilah: bgKeilah, ziklag: bgZiklag, jebus: bgJebus, zion: bgZion })[this.stage.bg](this.stage.width));
     once('stealthSpear', () => { const c = document.createElement('canvas'); c.width = 9; c.height = 60; const g = c.getContext('2d')!; g.fillStyle = '#1c1226'; g.fillRect(3, 6, 3, 54); g.fillStyle = '#7c4c2c'; g.fillRect(4, 7, 1, 52); g.fillStyle = '#9aa4ae'; g.fillRect(2, 0, 5, 8); return c; });
     once('jug', () => { const c = document.createElement('canvas'); c.width = 12; c.height = 14; const g = c.getContext('2d')!; g.fillStyle = '#1c1226'; g.fillRect(2, 3, 8, 11); g.fillRect(4, 0, 4, 4); g.fillStyle = '#b06a3a'; g.fillRect(3, 4, 6, 9); g.fillRect(5, 1, 2, 3); g.fillStyle = '#d8945a'; g.fillRect(4, 5, 1, 5); return c; });
     once('arrow', arrowCanvas);
@@ -269,7 +269,13 @@ export class StageScene extends Phaser.Scene {
   private applyHit(target: Fighter, a: Attack, dir: 1 | -1, heavyFx = false, src: 'staff' | 'stone' = 'staff') {
     if (target.g) { this.hitGoliath(target, a, dir, src); return; }
     target.hp -= a.dmg;
-    if (target.kind === 'chief') { const n = chiefCalls(target.hp + a.dmg, target.hp); if (n && target.hp > 0) this.callCamels(n * 2); }
+    if (target.kind === 'chief' || target.kind === 'lord') {
+      const n = chiefCalls(target.hp + a.dmg, target.hp);
+      if (n && target.hp > 0) {
+        if (target.kind === 'chief') this.callCamels(n * 2);
+        else { this.spawn([{ x: -40, y: 200, t: 'jebusite' }, { x: 520, y: 230, t: 'jebArcher' }]); this.pop('성주를 지켜라!', this.camX + 240, 90, true); }
+      }
+    }
     const heavy = a.knock || heavyFx || target.kind === 'camel';
     const boss = !!(target.kind && this.def(target).boss);
     const r = reaction(boss, heavy, target.hp <= 0);
@@ -1262,6 +1268,7 @@ export class StageScene extends Phaser.Scene {
   private leave() {
     const n = this.stage.next;
     if (n.scene === 'cutscene') this.scene.start('cutscene', { id: n.id });
+    else if (n.scene === 'shaft') this.scene.start('shaft');
     else this.scene.start('title');
   }
 }

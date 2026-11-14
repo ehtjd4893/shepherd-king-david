@@ -6,9 +6,9 @@ export interface Actor { id: string; x: number; y: number; anim?: string; flip?:
 /** qte = presses needed (mash the attack button; can't fail); banner = big gold line that pops up (item get). */
 /** bg switches the backdrop from this line on; fx 'gilboa' = dark mountain with Saul's crown and Jonathan's bow falling (1 Sam 31). */
 export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint' | 'gilboa'; qte?: number; banner?: string; bg?: Cutscene['bg'] }
-export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'wild' | 'ziklag' | 'dark'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } }
+export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'wild' | 'ziklag' | 'jebus' | 'zion' | 'dark'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } | { scene: 'credits' } }
 
-export const NAMES = { samuel: '사무엘', saul: '사울', jesse: '이새', david: '다윗', goliath: '골리앗', jonathan: '요나단', michal: '미갈', priest: '아히멜렉', achish: '아기스 왕', egypt: '이집트 소년' } as const;
+export const NAMES = { samuel: '사무엘', saul: '사울', jesse: '이새', david: '다윗', goliath: '골리앗', jonathan: '요나단', michal: '미갈', priest: '아히멜렉', achish: '아기스 왕', egypt: '이집트 소년', elder: '이스라엘 장로', lord: '여부스 성주' } as const;
 
 const SAMUEL = { id: 'samuel', x: 176, y: 192 };
 const SAUL = { id: 'saul', x: 292, y: 194, flip: true };
@@ -140,7 +140,30 @@ export const CUTSCENES: Record<string, Cutscene> = {
       { who: 'david', text: '이스라엘아, 어찌하여 용사들이 엎드러졌는가! 사울과 요나단은 살아 있을 때 사랑스럽고 아름다웠으니… (삼하 1:19, 23)' },
       { who: 'david', text: '내 형 요나단이여, 그대 때문에 내 마음이 아프오. 그대는 내게 참으로 귀한 사람이었소. (삼하 1:26)' },
     ],
-    next: { scene: 'title' }, // TODO(stage 7): → hebron
+    next: { scene: 'cutscene', id: 'hebron' },
+  },
+  hebron: {
+    bg: 'wild',
+    beats: [
+      { text: '다윗이 여호와께 여쭙고 헤브론으로 올라가자, 유다 사람들이 그에게 기름을 부어 유다의 왕으로 삼았다. (삼하 2:1-4)', actors: [{ id: 'davidS', x: 220, y: 190 }, { id: 'elder', x: 280, y: 186, flip: true }, { id: 'ally1', x: 160, y: 186 }] },
+      { text: '사울의 집과 다윗의 집 사이에 오랜 다툼이 있었지만, 다윗은 점점 강해졌다. (삼하 3:1)' },
+      { who: 'elder', text: '우리는 왕의 한 핏줄입니다. 여호와께서 "네가 내 백성 이스라엘의 목자가 되리라" 하셨습니다. (삼하 5:1-2)', actors: [{ id: 'davidS', x: 210, y: 190 }, { id: 'elder', x: 270, y: 186, flip: true }, { id: 'priest', x: 320, y: 188, flip: true }] },
+      { text: '이스라엘의 모든 장로가 다윗에게 기름을 부어 온 이스라엘의 왕으로 세웠다. 그때 다윗은 서른 살이었다. (삼하 5:3-4)', banner: '이스라엘의 왕 다윗!', actors: [{ id: 'davidK', x: 220, y: 190 }, { id: 'elder', x: 280, y: 186, flip: true }, { id: 'priest', x: 330, y: 188, flip: true }] },
+      { text: '왕이 된 다윗은 여부스 사람들이 지키는 예루살렘으로 올라갔다. (삼하 5:6)', bg: 'jebus', actors: [{ id: 'davidK', x: 180, y: 190 }, { id: 'ally2', x: 130, y: 186 }] },
+      { who: 'lord', text: '하하! 이 성벽은 아무도 넘지 못한다. 너희는 결코 여기 들어오지 못할 것이다! (삼하 5:6)', actors: [{ id: 'davidK', x: 180, y: 190 }, { id: 'lord', x: 340, y: 186, flip: true }] },
+      { who: 'david', text: '물 긷는 수구로 올라가라! 시온 산성을 되찾자! (삼하 5:8)' },
+    ],
+    next: { scene: 'stage', id: 'jerusalem' },
+  },
+  ending: {
+    bg: 'zion',
+    beats: [
+      { text: '다윗은 시온 산성을 빼앗았다. 그곳이 바로 다윗 성이다. (삼하 5:7)', banner: '다윗 성', actors: [{ id: 'davidK', x: 240, y: 190 }, { id: 'ally1', x: 180, y: 186 }, { id: 'ally3', x: 300, y: 188, flip: true }] },
+      { text: '다윗은 그 산성에 살면서 성을 둘러 쌓았다. (삼하 5:9)' },
+      { who: 'david', text: '들에서 양 떼를 따라다니던 저를, 여호와께서 이스라엘의 목자로 세우셨습니다.', actors: [{ id: 'davidK', x: 240, y: 190 }, { id: 'sheep', x: 290, y: 192 }, { id: 'sheep', x: 312, y: 184 }] },
+      { text: '다윗은 점점 강해졌다. 만군의 하나님 여호와께서 그와 함께 계셨기 때문이다. (삼하 5:10)' },
+    ],
+    next: { scene: 'credits' },
   },
   spare: {
     bg: 'wild',

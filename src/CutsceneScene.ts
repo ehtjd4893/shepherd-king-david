@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
-import { frameOf, downOf, sheepFrame, portraitOf, bgBeth, bgField, bgElah, bgGibeah, bgWild, bgZiklag, frame, R } from './art.ts';
+import { frameOf, downOf, sheepFrame, portraitOf, bgBeth, bgField, bgElah, bgGibeah, bgWild, bgZiklag, bgJebus, bgZion, frame, R } from './art.ts';
 import { sfx } from './sfx.ts';
 import { CUTSCENES, NAMES, type Actor, type Cutscene } from './cutscenes.ts';
 
-const BACKDROPS = { beth: bgBeth, field: () => bgField(480), elah: () => bgElah(480), gibeah: () => bgGibeah(480), wild: () => bgWild(480), ziklag: () => bgZiklag(480) };
+const BACKDROPS = { beth: bgBeth, field: () => bgField(480), elah: () => bgElah(480), gibeah: () => bgGibeah(480), wild: () => bgWild(480), ziklag: () => bgZiklag(480), jebus: () => bgJebus(480), zion: () => bgZion(480) };
 
 const FONT = '"Do Hyeon", "Apple SD Gothic Neo", sans-serif';
 const CPS = 30; // characters typed per second
@@ -139,6 +139,7 @@ export class CutsceneScene extends Phaser.Scene {
     const n = this.cs.next;
     if (n.scene === 'stage') this.scene.start('stage', { stage: n.id });
     else if (n.scene === 'cutscene') this.scene.start('cutscene', { id: n.id });
+    else if (n.scene === 'credits') this.scene.start('credits');
     else this.scene.start('title');
   }
 

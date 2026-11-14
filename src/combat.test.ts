@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hits, stepProg, camelPhase, chiefCalls, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, HEAR_RANGE, HEAR_RATE, swordify, COMBO, SWORD_REACH, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP, type Prog, type Section } from './combat.ts';
+import { hits, stepProg, rockHits, slideDown, SHAFT, camelPhase, chiefCalls, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, HEAR_RANGE, HEAR_RATE, swordify, COMBO, SWORD_REACH, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP, type Prog, type Section } from './combat.ts';
 
 test('spin spends faith first, then a little health, never the last of it', () => {
   assert.deepEqual(spinCost(SPIN_FAITH, 50), { faith: 0, hp: 50 });
@@ -153,4 +153,12 @@ test('the Amalekite chief calls riders once per threshold crossed', () => {
   assert.equal(chiefCalls(125, 115), 1);
   assert.equal(chiefCalls(125, 50), 2); // a big hit past both
   assert.equal(chiefCalls(115, 100), 0); // already called
+});
+
+test('water shaft: a falling stone hits only in David\'s column and height, and only slides him down', () => {
+  assert.equal(rockHits({ x: 240, y: 300 }, { x: 244, y: 310 }), true);
+  assert.equal(rockHits({ x: 196, y: 300 }, { x: 240, y: 310 }), false); // other column
+  assert.equal(rockHits({ x: 240, y: 200 }, { x: 240, y: 310 }), false); // still above him
+  assert.equal(slideDown(400, 840), 400 + SHAFT.slide);
+  assert.equal(slideDown(830, 840), 840); // never below the water
 });

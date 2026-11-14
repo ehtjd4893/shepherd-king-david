@@ -1,11 +1,11 @@
 import type { Section } from './combat.ts';
 
 /** Where to go after the stage is cleared. */
-export type Next = { scene: 'cutscene'; id: string } | { scene: 'title' };
+export type Next = { scene: 'cutscene'; id: string } | { scene: 'title' } | { scene: 'shaft' };
 /** On-screen tip shown once when David passes world x `at`. */
 export interface Hint { at: number; pc: string; touch: string }
 export interface StageDef {
-  title: string; width: number; bg: 'field' | 'elah' | 'gibeah' | 'wild' | 'keilah' | 'ziklag'; sheep: number; sections: Section[]; hints: Hint[]; next: Next;
+  title: string; width: number; bg: 'field' | 'elah' | 'gibeah' | 'wild' | 'keilah' | 'ziklag' | 'jebus' | 'zion'; sheep: number; sections: Section[]; hints: Hint[]; next: Next;
   /** David's start x (default 60); stones he starts with (default 5); brook = stones wash up while he's short */
   start?: number; ammo?: number; brook?: boolean;
   /** the faith special becomes the harp (from stage 3) */
@@ -194,5 +194,45 @@ export const STAGES: Record<string, StageDef> = {
       { at: 1920, waves: [[{ x: 520, y: 210, t: 'chief' }, { x: -40, y: 196, t: 'amalek' }]] },
     ],
     next: { scene: 'cutscene', id: 'gilboa' },
+  },
+  jerusalem: {
+    title: 'STAGE 7 · 여부스',
+    width: 1600,
+    bg: 'jebus',
+    sheep: 0,
+    harp: true,
+    sword: true,
+    allies: true,
+    hints: [
+      { at: 0, pc: '여부스 병사는 창이 길다. 찌르기 끝을 노려 파고드세요', touch: '여부스 병사는 창이 길다. 찌르기 끝을 노려 파고드세요' },
+    ],
+    sections: [
+      { at: 0, waves: [[{ x: 520, y: 200, t: 'jebusite' }, { x: 540, y: 232, t: 'jebusite' }, { x: -40, y: 214 , t: 'jebusite' }]] },
+      {
+        at: 560, waves: [
+          [{ x: 520, y: 196, t: 'jebusite' }, { x: 560, y: 226, t: 'jebArcher' }, { x: -40, y: 210, t: 'jebusite' }],
+          [{ x: 520, y: 236, t: 'jebusite' }, { x: 560, y: 196, t: 'jebArcher' }, { x: -40, y: 222, t: 'jebArcher' }, { x: 540, y: 206, t: 'jebusite' }],
+        ],
+      },
+      { at: 1120, waves: [[{ x: 520, y: 190, t: 'jebArcher' }, { x: 540, y: 220, t: 'jebusite' }, { x: -40, y: 206, t: 'jebusite' }, { x: -60, y: 238, t: 'jebusite' }]] },
+    ],
+    next: { scene: 'shaft' },
+  },
+  zion: {
+    title: '시온 산성',
+    width: 1120,
+    bg: 'zion',
+    sheep: 0,
+    harp: true,
+    sword: true,
+    allies: true,
+    hints: [
+      { at: 640, pc: '여부스 성주! 방패를 들고 웅크리면 붉은 선, 돌진을 피하세요', touch: '여부스 성주! 방패를 들고 웅크리면 붉은 선, 돌진을 피하세요' },
+    ],
+    sections: [
+      { at: 0, waves: [[{ x: 520, y: 200, t: 'jebusite' }, { x: 540, y: 232, t: 'jebArcher' }, { x: -40, y: 214, t: 'jebusite' }]] },
+      { at: 640, waves: [[{ x: 520, y: 210, t: 'lord' }, { x: -40, y: 196, t: 'jebusite' }]] },
+    ],
+    next: { scene: 'cutscene', id: 'ending' },
   },
 };
