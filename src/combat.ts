@@ -48,11 +48,13 @@ export const SOLDIER_THRUST: Attack = { pose: 'atk', dur: 0.48, active: [0.28, 0
 const BITE: Attack = { pose: 'atk', dur: 0.32, active: [0.14, 0.22], box: { from: 0, to: 30, height: 24 }, dmg: 7, knock: false, lunge: 210 };
 const CLUB: Attack = { pose: 'atk', dur: 0.38, active: [0.22, 0.3], box: { from: 0, to: 34, height: 30 }, dmg: 9, knock: false, lunge: 100 };
 const BEAR_SWIPE: Attack = { pose: 'atk', dur: 0.7, active: [0.42, 0.54], box: { from: 0, to: 52, height: 50 }, dmg: 16, knock: true, lunge: 60 };
-const BEAR_CHARGE: Attack = { pose: 'atk', dur: 0.75, active: [0.2, 0.7], box: { from: -4, to: 40, height: 40 }, dmg: 14, knock: true, lunge: 240, keep: true };
+const BEAR_CHARGE: Attack = { pose: 'atk', dur: 0.95, active: [0.45, 0.9], box: { from: -4, to: 40, height: 40 }, dmg: 14, knock: true, lunge: 240, keep: true };
 const LION_CLAW: Attack = { pose: 'atk', dur: 0.42, active: [0.22, 0.32], box: { from: 0, to: 46, height: 40 }, dmg: 13, knock: false, lunge: 150 };
-const LION_POUNCE: Attack = { pose: 'atk', dur: 0.8, active: [0.3, 0.75], box: { from: -6, to: 42, height: 46 }, dmg: 18, knock: true, lunge: 240, keep: true, leap: 230 };
+const LION_POUNCE: Attack = { pose: 'atk', dur: 0.95, active: [0.45, 0.9], box: { from: -6, to: 42, height: 46 }, dmg: 18, knock: true, lunge: 240, keep: true, leap: 230 };
 
 /** Archer: aim (bow drawn, warning line), loose at active[0]; the arrow itself does the damage. */
+/** Philistine captain: crouches behind his shield, then charges down the lane. */
+const SHIELD_CHARGE: Attack = { pose: 'atk', dur: 0.9, active: [0.45, 0.85], box: { from: -4, to: 40, height: 40 }, dmg: 14, knock: true, lunge: 230, keep: true };
 const ARROW_SHOT: Attack = { pose: 'atk', dur: 0.8, active: [0.6, 0.6], box: { from: 0, to: 0, height: 0 }, dmg: 8, knock: false, lunge: 0 };
 /** Saul: raise the spear over the lane for a moment, then hurl it. */
 const SAUL_THROW: Attack = { pose: 'throw', dur: 1.1, active: [0.8, 0.8], box: { from: 0, to: 0, height: 0 }, dmg: 22, knock: true, lunge: 0 };
@@ -73,6 +75,7 @@ export const ENEMIES = {
   bear: { name: '곰', hp: 150, speed: 62, reach: 44, hw: 16, attack: BEAR_SWIPE, ai: 'soldier', boss: true, special: { attack: BEAR_CHARGE, from: 110, to: 260, every: 3.5 } },
   philD: { name: '블레셋 궁수', hp: 26, speed: 80, reach: 150, hw: 6, attack: ARROW_SHOT, ai: 'archer' },
   saul: { name: '사울 왕', hp: 9999, speed: 0, reach: 0, hw: 8, attack: SAUL_THROW, ai: 'saul', untouchable: true },
+  captain: { name: '블레셋 대장', hp: 160, speed: 85, reach: 38, hw: 8, attack: SOLDIER_SLASH, ai: 'soldier', boss: true, scale: 1.3, special: { attack: SHIELD_CHARGE, from: 90, to: 240, every: 3 } },
   philC: { name: '방패병', hp: 44, speed: 70, reach: 34, hw: 6, attack: SOLDIER_SLASH, ai: 'soldier' },
   goliath: { name: '골리앗', hp: 100, speed: 34, reach: 90, hw: 22, attack: SOLDIER_THRUST, ai: 'goliath', boss: true, scale: 1.6 },
   lion: { name: '사자', hp: 200, speed: 120, reach: 42, hw: 15, attack: LION_CLAW, ai: 'soldier', boss: true, special: { attack: LION_POUNCE, from: 80, to: 180, every: 2.4 } },
@@ -152,3 +155,13 @@ export function archerStep(dist: number): -1 | 0 | 1 {
   if (dist > 170) return 1;
   return 0;
 }
+
+// ---------- Flight (1 Sam 21-23) ----------
+/** Goliath's sword (1 Sam 21:9): David's melee hits harder and reaches further from stage 4 on. */
+export const SWORD_DMG = 1.5, SWORD_REACH = 6;
+export function swordify(a: Attack): Attack {
+  return { ...a, dmg: Math.round(a.dmg * SWORD_DMG), box: { ...a.box, to: a.box.to + SWORD_REACH } };
+}
+/** Adullam companions (1 Sam 22:2): three men charge across the screen, knocking down whoever they pass. */
+export const ALLY_COOLDOWN = 12, ALLY_SPEED = 260;
+export const ALLY_RUSH: Attack = { pose: 'walk', dur: 0, active: [0, 0], box: { from: -10, to: 12, height: 40 }, dmg: 12, knock: true, lunge: 0 };

@@ -3,10 +3,11 @@
 /** A figure on stage. `from` = walk in from this x when the line starts; k = size (Goliath is big); down = lying on the ground. */
 export interface Actor { id: string; x: number; y: number; anim?: string; flip?: boolean; from?: number; k?: number; down?: boolean }
 /** One line. `actors` replaces who is on stage (omit to keep the previous set). */
-export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint' }
-export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'dark'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } }
+/** qte = presses needed (mash the attack button; can't fail); banner = big gold line that pops up (item get). */
+export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint'; qte?: number; banner?: string }
+export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'wild' | 'dark'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } }
 
-export const NAMES = { samuel: '사무엘', saul: '사울', jesse: '이새', david: '다윗', goliath: '골리앗', jonathan: '요나단', michal: '미갈' } as const;
+export const NAMES = { samuel: '사무엘', saul: '사울', jesse: '이새', david: '다윗', goliath: '골리앗', jonathan: '요나단', michal: '미갈', priest: '아히멜렉', achish: '아기스 왕' } as const;
 
 const SAMUEL = { id: 'samuel', x: 176, y: 192 };
 const SAUL = { id: 'saul', x: 292, y: 194, flip: true };
@@ -97,8 +98,32 @@ export const CUTSCENES: Record<string, Cutscene> = {
       { text: '미갈은 다윗을 창문으로 달아 내리고, 침상에 우상을 눕힌 뒤 염소털을 씌웠다. (삼상 19:12-13)' },
       { text: '사울의 부하들이 들이닥쳤지만, 이불 속에는 염소털 베개만 있었다.', actors: [{ id: 'michal', x: 260, y: 186, flip: true }] },
       { text: '다윗은 라마에 있는 사무엘에게로 피했다. 쫓기는 도망자의 길이 시작되었다. (삼상 19:18)', actors: [{ id: 'samuel', x: 260, y: 188, flip: true }, { id: 'david', x: 200, y: 190 }] },
-      { text: '다음 이야기: 도피의 길 (준비 중)', actors: [] },
     ],
-    next: { scene: 'title' },
+    next: { scene: 'cutscene', id: 'flight' },
+  },
+  flight: {
+    bg: 'wild',
+    beats: [
+      { text: '다윗은 놉 땅의 제사장 아히멜렉을 찾아갔다. 배는 고팠고, 손에는 무기도 없었다. (삼상 21:1)', actors: [{ id: 'priest', x: 290, y: 186, flip: true }, { id: 'david', x: 200, y: 190 }] },
+      { who: 'priest', text: '여기 거룩한 떡이 있소. 그리고… 엘라 골짜기에서 그대가 쓰러뜨린 골리앗의 칼이 보자기에 싸여 있소. (삼상 21:6, 9)' },
+      { who: 'david', text: '그만한 칼이 없지요. 제게 주십시오! (삼상 21:9)', banner: '골리앗의 칼을 얻었다!' },
+      { text: '다윗은 사울을 피해 가드 왕 아기스에게로 갔다. 그러나 신하들이 그를 알아보았다. "만만을 죽였다는 그 다윗이다!" (삼상 21:10-11)', actors: [{ id: 'achish', x: 320, y: 186, flip: true }, { id: 'davidS', x: 200, y: 190 }] },
+      { text: '다윗은 미친 척하며 대문짝에 마구 낙서를 했다! (삼상 21:13)  공격 버튼을 연타하세요!', qte: 14, actors: [{ id: 'achish', x: 340, y: 186, flip: true }, { id: 'davidS', x: 200, y: 190, anim: 'flail' }] },
+      { who: 'achish', text: '아니, 미친 사람을 왜 내게 데려왔느냐! 내게 미친 사람이 모자라더냐? (삼상 21:15)' },
+      { text: '다윗은 아둘람 굴로 피했다. 형제들과, 쫓기고 빚지고 마음이 원통한 사람 사백 명이 모여들었다. (삼상 22:1-2)', actors: [{ id: 'davidS', x: 200, y: 190 }, { id: 'ally1', x: 250, y: 184, flip: true }, { id: 'ally2', x: 290, y: 192, flip: true }, { id: 'ally3', x: 330, y: 186, flip: true }] },
+      { text: '그때 소식이 왔다. 블레셋 사람들이 그일라를 쳐서 타작마당의 곡식을 빼앗고 있다! (삼상 23:1)' },
+      { who: 'david', text: '여호와께서 가라고 하셨다. 그일라를 구하러 가자! (삼상 23:2-4)', banner: '동료를 부를 수 있다! (G)' },
+    ],
+    next: { scene: 'stage', id: 'keilah' },
+  },
+  keilahAfter: {
+    bg: 'wild',
+    beats: [
+      { text: '다윗은 블레셋을 크게 무찌르고 그일라 사람들을 구원했다. (삼상 23:5)', actors: [{ id: 'davidS', x: 220, y: 190 }, { id: 'ally1', x: 270, y: 186 }, { id: 'ally3', x: 310, y: 190 }] },
+      { text: '그러나 사울이 군대를 이끌고 내려오자, 다윗은 십 광야의 요새로 몸을 피했다. 사울은 날마다 그를 찾았다. (삼상 23:13-14)', actors: [{ id: 'davidS', x: 220, y: 190 }] },
+      { who: 'jonathan', text: '두려워 말게. 아버지의 손이 자네에게 미치지 못할 걸세. 자네는 이스라엘의 왕이 되고, 나는 그 다음이 될 걸세. (삼상 23:16-17)', actors: [{ id: 'jonathan', x: 280, y: 186, flip: true }, { id: 'davidS', x: 210, y: 190 }] },
+      { text: '두 사람은 여호와 앞에서 언약을 맺고, 요나단은 집으로 돌아갔다. 다윗은 엔게디 요새로 올라갔다. (삼상 23:18, 29)', actors: [{ id: 'davidS', x: 230, y: 190 }] },
+    ],
+    next: { scene: 'title' }, // TODO(stage 5): → engedi
   },
 };

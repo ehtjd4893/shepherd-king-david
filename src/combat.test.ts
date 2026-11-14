@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hits, stepProg, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP, type Prog, type Section } from './combat.ts';
+import { hits, stepProg, swordify, COMBO, SWORD_REACH, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP, type Prog, type Section } from './combat.ts';
 
 test('spin spends faith first, then a little health, never the last of it', () => {
   assert.deepEqual(spinCost(SPIN_FAITH, 50), { faith: 0, hp: 50 });
@@ -105,4 +105,11 @@ test("Saul's spear: a jump clears it, standing in its lane does not", () => {
   assert.equal(hits(spear, SHOT_BOX, { x: 104, y: 200, z: 0, hw: 6 }), true);
   assert.equal(hits(spear, SHOT_BOX, { x: 104, y: 200, z: 30, hw: 6 }), false);
   assert.equal(hits(spear, SHOT_BOX, { x: 104, y: 214, z: 0, hw: 6 }), false);
+});
+
+test("Goliath's sword hits harder and reaches further, without touching the original move", () => {
+  const a = swordify(COMBO[0]);
+  assert.equal(a.dmg, 12);
+  assert.equal(a.box.to, COMBO[0].box.to + SWORD_REACH);
+  assert.equal(COMBO[0].dmg, 8);
 });

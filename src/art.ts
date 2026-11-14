@@ -38,6 +38,7 @@ function outline(c,col=C.out){const g=c.getContext('2d'),W=c.width,H=c.height,d=
 /* ---------- character drawer: one rig, many costumes ---------- */
 function human(S,P,k,wu){
   k*=S.tall||1;
+  if(S.gsword&&P.item==='staff')P={...P,item:'gsword'};
   const W=Math.ceil(wu*k)+4,H=Math.ceil(62*k)+6,c=mk(W,H),g=ctx2(c);
   const ox=rd(W/2),oy=H-3,X=u=>ox+u*k,Y=u=>oy+u*k;
   const b=P.bob||0,ln=P.lean||0,t3=Math.max(2,rd(3*k)),t4=Math.max(3,rd(4*k)),u1=Math.max(1,rd(k));
@@ -132,6 +133,7 @@ function human(S,P,k,wu){
   function item(){if(!P.item||P.item==='bow')return;const a=P.ia||0,dx=Math.cos(a),dy=Math.sin(a),hx=X(hF[0]),hy=Y(hF[1]),t2=Math.max(1,rd(2*k));
     const seg=(b0,f0,t,col)=>L(g,hx-dx*b0*k,hy-dy*b0*k,hx+dx*f0*k,hy+dy*f0*k,t,col);
     if(P.item==='staff')staffAt(hx,hy,a,12,22);
+    else if(P.item==='gsword'){seg(1,21,t2+1,C.ironL);seg(-12,21,1,C.iron);seg(-20,23,Math.max(1,t2-1),C.ironL);L(g,hx+dy*3.5*k,hy-dx*3.5*k,hx-dy*3.5*k,hy+dx*3.5*k,t2+1,C.bronze);seg(4,0,t2+1,C.woodD);D(g,hx-dx*4.5*k,hy-dy*4.5*k,Math.max(1,rd(1.3*k)),C.bronze)}
     else if(P.item==='sword'){seg(1,13,t2,C.ironL);seg(-9,13,u1,C.iron);L(g,hx+dy*2.5*k,hy-dx*2.5*k,hx-dy*2.5*k,hy+dx*2.5*k,t2,C.bronze);seg(3,0,t2,C.woodD)}
     else if(P.item==='spear'){const n=S.spearLen||24;seg(14,n,Math.max(2,rd(2.4*k)),C.wood);seg(-(n-1),n+6,Math.max(2,rd(3*k)),C.iron);seg(-(n+5),n+8,u1,C.ironL)}
     else if(P.item==='club'){seg(2,12,t2+1,C.woodD);D(g,hx+dx*12*k,hy+dy*12*k,Math.max(1,rd(1.8*k)),C.wood)}
@@ -240,6 +242,14 @@ CAST.bro3={...broBase,tunic:C.brown,tunicD:C.brownD,tunicL:C.brownL,sash:C.green
 CAST.bro4={...broBase,tunic:C.oatD,tunicD:C.brownD,tunicL:C.oat,sash:C.kiltD};
 CAST.philD={...CAST.philA,tunic:C.brown,tunicD:C.brownD,tunicL:C.brownL,armor:null,weapon:'bow',wu:80};
 CAST.michal={skin:C.skin,skinD:C.skinD,hair:C.dark,hairStyle:'hood',hood:'#b04a6a',tunic:'#e0a8b4',tunicD:'#b47a88',tunicL:'#f4c8d0',sash:C.gold,robe:1,blush:'#e3806a',leg:C.skin,legD:C.skinD,shoe:C.wood,pose:'bro',wu:40};
+CAST.davidS={...CAST.david,gsword:1};
+CAST.priest={skin:C.old,skinD:C.oldD,hair:C.white,hairStyle:'hood',hood:'#e8e0cc',tunic:'#f2eee2',tunicD:'#c8c0aa',tunicL:'#ffffff',sash:C.indigo,robe:1,beard:C.gray,beardD:C.grayD,beardLen:8,browC:C.gray,leg:C.oldD,legD:C.oldD,shoe:C.woodD,pose:'bro',wu:40};
+CAST.achish={skin:C.skinP,skinD:C.skinPD,hair:C.dark,hairStyle:'king',tunic:C.kilt,tunicD:C.kiltD,tunicL:C.kiltL,sash:C.gold,trim:C.gold,robe:1,crown:1,beard:C.beard,beardD:C.beardD,beardLen:4,leg:C.skinP,legD:C.skinPD,shoe:C.woodD,pose:'bro',wu:40,tall:1.05};
+const allyBase={skin:C.skin,skinD:C.skinD,leg:C.skin,legD:C.skinD,shoe:C.woodD,pose:'soldier',wu:80};
+CAST.ally1={...allyBase,hair:C.dark,hairStyle:'king',beard:C.beard,beardD:C.beardD,beardLen:4,tunic:C.brown,tunicD:C.brownD,tunicL:C.brownL,sash:C.teal,weapon:'club'};
+CAST.ally2={...allyBase,hair:C.red,hairL:C.redL,hairStyle:'curly',tunic:C.olive,tunicD:C.oliveD,tunicL:C.oliveL,sash:C.leather,weapon:'spear',spearLen:18,wu:92};
+CAST.ally3={...allyBase,hair:C.dark,hairStyle:'hood',hood:'#6a6a7a',beard:C.beard,beardD:C.beardD,beardLen:5,tunic:'#7a7a88',tunicD:'#55556a',tunicL:'#9a9aa8',sash:C.oatD,weapon:'club'};
+CAST.captain={...CAST.philA,armor:'scale',armorC:C.bronze,armorD:C.bronzeD,sash:C.gold,trim:C.gold,shield:1,tunic:C.kiltD,tunicD:'#5a1a1a',tunicL:C.kilt};
 CAST.jonathan={skin:C.skin,skinD:C.skinD,hair:C.dark,hairStyle:'king',tunic:C.blue,tunicD:C.blueD,tunicL:C.blueL,sash:C.gold,trim:C.gold,leg:C.skin,legD:C.skinD,shoe:C.wood,pose:'bro',wu:40,tall:1.06};
 CAST.thief={skin:C.skinP,skinD:C.skinPD,hair:C.dark,hairStyle:'hood',hood:'#7a5a3c',tunic:'#5c4433',tunicD:'#3e2c20',tunicL:'#7a5c44',sash:C.oatD,fringe:1,beard:C.beard,beardD:C.beardD,beardLen:3,leg:C.skinP,legD:C.skinPD,shoe:C.woodD,pose:'soldier',weapon:'club',wu:80};
 // four-legged cast: units at size 1, facing right, feet on y=0
@@ -428,5 +438,38 @@ export function bgGibeah(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(31),court=S
   for(let y=164;y<270;y+=14)R(g,court,y,480,1,'#7a6a58');
   for(let y=152,r=0;y<270;y+=14,r++)for(let x=court+(r%2?0:20);x<SW;x+=40)R(g,x,y,1,14,'#7a6a58');
   R(g,SW-70,120,70,36,'#6a3a5a');R(g,SW-70,120,70,3,C.gold);R(g,SW-46,82,26,40,C.purple);R(g,SW-48,78,30,6,C.gold);R(g,SW-46,96,26,3,C.goldD);
+  return c}
+// Judean wilderness: pale cliffs with cave mouths, acacias, dry wadi floor.
+export function bgWild(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(41);
+  sky(g,['#8cbcd8','#a8cce0','#c4dce2','#e2e6d6','#f0e2c0'],0,120,SW);
+  for(let x=60;x<SW;x+=240+rd(rnd()*200))cloud(g,x,20+rnd()*30,.7+rnd()*.5);
+  const far=x=>104-14*Math.sin(x*.008+1)-9*Math.sin(x*.023)-3*Math.sin(x*.1);
+  for(let x=0;x<SW;x++){const h=rd(far(x));R(g,x,h,1,150-h,'#c8b494');R(g,x,h,1,1,'#dccaa8')}
+  const mid=x=>128-12*Math.sin(x*.013+3)-4*Math.sin(x*.06);
+  for(let x=0;x<SW;x++){const h=rd(mid(x));R(g,x,h,1,150-h,'#b09068');R(g,x,h,1,1,'#c8a880');for(let y=h+4;y<150;y+=5)if((x+y)%7===0)R(g,x,y,1,1,'#9a7c58')}
+  for(let x=90;x<SW;x+=260+rd(rnd()*160)){const y=rd(mid(x))+10;D(g,x,y+6,9,'#3a2a24');R(g,x-9,y+6,19,8,'#3a2a24');R(g,x-10,y-3,21,2,'#c8a880')}
+  for(let x=40;x<SW;x+=120+rd(rnd()*140)){const y=rd(mid(x))+2;L(g,x,y,x,y-8,2,'#5a3a26');R(g,x-8,y-12,17,3,'#6f7a3a');R(g,x-5,y-14,11,2,'#8a9a4a')}
+  for(let y=148;y<270;y++)R(g,0,y,SW,1,y<149?'#9a7c58':y<168?'#c4a674':y<210?'#ccae7c':'#d4b684');
+  const n=SW/480;
+  for(let i=0;i<650*n;i++){const x=rnd()*SW,y=150+rnd()*110;R(g,x,y,1,1,rnd()<.5?'#b0925e':'#e2c898')}
+  for(let i=0;i<30*n;i++){const x=rnd()*SW,y=156+rnd()*96,r=1+rd(rnd()*2);D(g,x,y,r+1,'#8a7258');D(g,x,y-1,r,'#c0b49c')}
+  for(let i=0;i<20*n;i++){const x=rd(rnd()*SW),y=rd(158+rnd()*90);R(g,x,y-3,1,3,'#8a8a3a');R(g,x-1,y-2,1,2,'#8a8a3a')}
+  return c}
+// Keilah: grain fields and stone threshing floors heaped with sheaves, the town wall at the far end.
+export function bgKeilah(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(53);
+  sky(g,['#7cb0d4','#98c2dc','#b8d6e0','#d8e4d8','#f2e8c4'],0,125,SW);
+  for(let x=50;x<SW;x+=210+rd(rnd()*170))cloud(g,x,18+rnd()*32,.8+rnd()*.5);
+  const far=x=>110-12*Math.sin(x*.007+2)-6*Math.sin(x*.02);
+  for(let x=0;x<SW;x++){const h=rd(far(x));R(g,x,h,1,150-h,'#a8a088')}
+  const mid=x=>134-8*Math.sin(x*.011)-2*Math.sin(x*.05);
+  for(let x=0;x<SW;x++){const h=rd(mid(x));R(g,x,h,1,150-h,'#c8a85a');R(g,x,h,1,1,'#e0c070');for(let y=h+3;y<150;y+=3)if((x*3+y)%5===0)R(g,x,y,1,2,'#b8984a')}
+  const wallX=SW-300;R(g,wallX,96,300,54,'#b89a74');for(let x=wallX;x<SW;x+=8)R(g,x,92,5,4,'#b89a74');for(let y=104;y<150;y+=8)R(g,wallX,y,300,1,'#9a7c58');
+  R(g,wallX+120,112,26,38,'#4a3428');D(g,wallX+133,112,13,'#4a3428');R(g,wallX,96,300,1,'#d4b890');
+  for(let y=148;y<270;y++)R(g,0,y,SW,1,y<149?'#9a7c4a':y<170?'#bca06a':y<210?'#c6a872':'#cfb07a');
+  const n=SW/480;
+  for(let i=0;i<650*n;i++){const x=rnd()*SW,y=150+rnd()*110;R(g,x,y,1,1,rnd()<.5?'#a88a56':'#e0c890')}
+  for(let x=140;x<SW-200;x+=330+rd(rnd()*120)){const y=176+rd(rnd()*40);for(let dy=-7;dy<=7;dy++){const h=rd(46*Math.sqrt(1-(dy/7.5)**2));R(g,x-h,y+dy,h*2,1,dy===-7?'#d8cab0':'#b8a890')}
+    for(const [ox,oy] of[[-14,-3],[8,-4],[-2,2]]){D(g,x+ox,y+oy-4,6,'#e2c060');D(g,x+ox,y+oy-6,4,'#f0d880');R(g,x+ox-1,y+oy-4,2,4,'#c09a40')}}
+  for(let i=0;i<24*n;i++){const x=rd(rnd()*SW),y=rd(158+rnd()*94);R(g,x,y-4,1,4,'#d8b850');R(g,x+1,y-3,1,3,'#c8a840')}
   return c}
 export{C,mk,ctx2,R,D,L,frame,bar};

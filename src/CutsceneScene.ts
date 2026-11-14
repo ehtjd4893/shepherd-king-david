@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { frameOf, downOf, sheepFrame, portraitOf, bgBeth, bgField, bgElah, bgGibeah, frame, R } from './art.ts';
+import { frameOf, downOf, sheepFrame, portraitOf, bgBeth, bgField, bgElah, bgGibeah, bgWild, frame, R } from './art.ts';
+import { sfx } from './sfx.ts';
 import { CUTSCENES, NAMES, type Actor, type Cutscene } from './cutscenes.ts';
 
 const FONT = '"Do Hyeon", "Apple SD Gothic Neo", sans-serif';
@@ -21,13 +22,16 @@ export class CutsceneScene extends Phaser.Scene {
   private fx!: Phaser.GameObjects.Graphics;
   private ui!: Phaser.GameObjects.Graphics;
   private anointing = false;
+  private qteGot = 0;
+  private scribbles: number[][] = [];
+  private qteText!: Phaser.GameObjects.Text;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
 
   constructor() { super('cutscene'); }
 
   init(d: { id: string }) {
     this.cs = CUTSCENES[d.id];
-    this.i = 0; this.lineT = 0; this.T = 0; this.started = false; this.cast = []; this.anointing = false;
+    this.i = 0; this.lineT = 0; this.T = 0; this.started = false; this.cast = []; this.anointing = false; this.qteGot = 0; this.scribbles = [];
   }
 
   create() {
@@ -35,7 +39,7 @@ export class CutsceneScene extends Phaser.Scene {
     if (bg === 'dark') this.add.rectangle(0, 0, 480, 270, 0x0d0a14).setOrigin(0);
     else {
       const key = `bg_${bg}480`;
-      if (!this.textures.exists(key)) this.textures.addCanvas(key, bg === 'beth' ? bgBeth() : bg === 'elah' ? bgElah(480) : bg === 'gibeah' ? bgGibeah(480) : bgField(480));
+      if (!this.textures.exists(key)) this.textures.addCanvas(key, bg === 'beth' ? bgBeth() : bg === 'elah' ? bgElah(480) : bg === 'gibeah' ? bgGibeah(480) : bg === 'wild' ? bgWild(480) : bgField(480));
       this.add.image(0, 0, key).setOrigin(0);
     }
     this.fx = this.add.graphics().setDepth(500);
@@ -46,6 +50,7 @@ export class CutsceneScene extends Phaser.Scene {
     this.face = this.add.image(15, 206, '__DEFAULT').setOrigin(0).setDepth(1001).setVisible(false);
     this.name = this.add.text(80, 189, '', { fontFamily: FONT, fontSize: '10px', color: '#f2c14e' }).setDepth(1002);
     this.body = this.add.text(80, 209, '', { fontFamily: FONT, fontSize: '11px', color: '#f5ecd8', lineSpacing: 4, wordWrap: { width: 378 } }).setDepth(1002);
+    this.qteText = this.add.text(240, 22, '', { fontFamily: FONT, fontSize: '12px', color: '#ffe27a', stroke: '#1c1226', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(1004);
     this.add.text(472, 6, '건너뛰기 ▶▶', { fontFamily: FONT, fontSize: '9px', color: '#ffffff', stroke: '#0d0a14', strokeThickness: 2 }).setOrigin(1, 0).setDepth(1002).setAlpha(0.8);
 
     this.keys = this.input.keyboard!.addKeys('Z,X,J,K,ENTER,SPACE,ESC') as Record<string, Phaser.Input.Keyboard.Key>;
@@ -72,6 +77,8 @@ export class CutsceneScene extends Phaser.Scene {
     this.started = true;
     this.i = i; this.lineT = 0;
     const b = this.cs.beats[i];
+    this.qteGot = 0; this.scribbles = [];
+    if (b.banner) this.banner(b.banner);
     if (b.fx === 'anoint') this.anointing = true;
     else if (b.actors) this.anointing = false;
     if (b.actors) {
@@ -93,10 +100,28 @@ export class CutsceneScene extends Phaser.Scene {
     this.face.setVisible(!!b.who);
   }
 
+  private banner(text: string) {
+    const t = this.add.text(240, 96, text, { fontFamily: FONT, fontSize: '20px', color: '#ffe27a', stroke: '#7a2416', strokeThickness: 4 })
+      .setOrigin(0.5).setDepth(1500).setScale(0.3);
+    this.tweens.add({ targets: t, scale: 1, duration: 180, ease: 'Back.Out' });
+    this.tweens.add({ targets: t, alpha: 0, delay: 1800, duration: 400, onComplete: () => t.destroy() });
+    sfx.harp();
+  }
+
   private typed() { return Math.min(this.cs.beats[this.i].text.length, Math.floor(this.lineT * CPS)); }
 
   private advance() {
     if (!this.started) return;
+    const q = this.cs.beats[this.i].qte;
+    if (q && this.qteGot < q) {
+      // mash: every press scribbles on the gate; it can't be failed, only finished
+      this.qteGot++;
+      this.lineT = 1e3;
+      this.scribbles.push([262 + Math.random() * 46, 128 + Math.random() * 54, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 22]);
+      sfx.swing();
+      if (this.qteGot === q) this.banner('해냈다!');
+      return;
+    }
     if (this.typed() < this.cs.beats[this.i].text.length) { this.lineT = 1e3; return; } // first press finishes the line
     if (this.i + 1 < this.cs.beats.length) this.startLine(this.i + 1);
     else this.finish();
@@ -129,7 +154,7 @@ export class CutsceneScene extends Phaser.Scene {
     for (const c of this.cast) {
       const a = c.a, walkIn = a.from !== undefined && this.lineT < 1.1 && !!b.actors;
       const x = walkIn ? a.from! + (a.x - a.from!) * (this.lineT / 1.1) : a.x;
-      const anim = a.down ? 'hurt' : walkIn ? 'walk' : a.anim ?? 'idle';
+      const anim = a.down ? 'hurt' : walkIn ? 'walk' : a.anim === 'flail' ? (this.qteGot % 2 ? 'atk3' : 'jump') : a.anim ?? 'idle';
       const f = a.down ? 0 : a.id === 'sheep' ? (walkIn ? Math.floor(this.T * 8) % 2 : 0) : anim === 'walk' ? Math.floor(this.T * 8) % 4 : anim === 'idle' || anim === 'laugh' ? Math.floor(this.T * 2.5) % 2 : anim === 'harp' ? Math.floor(this.T * 6) % 2 : 0;
       const key = this.frameKey(a.id, a.id === 'sheep' ? 'idle' : anim, f, a.k, a.down), o = this.origins.get(key)!;
       c.img.setTexture(key).setOrigin(o[0], o[1]).setPosition(Math.round(x), a.y);
@@ -147,6 +172,16 @@ export class CutsceneScene extends Phaser.Scene {
       }
     }
     this.ui.clear();
+    const q = b.qte;
+    this.qteText.setText(q ? (this.qteGot < q ? `연타! ${this.qteGot} / ${q}` : '') : '');
+    if (q) {
+      // the gate of Gath, getting covered in scribbles
+      this.fx.fillStyle(0x6a4a30, 1).fillRect(262, 124, 50, 66).fillStyle(0x4a3220, 1);
+      for (let x = 270; x < 312; x += 10) this.fx.fillRect(x, 124, 1, 66);
+      this.fx.lineStyle(1, 0xf3ecd9, 1);
+      for (const [x, y, dx, dy] of this.scribbles) this.fx.lineBetween(x, y, x + dx, y + dy);
+      if (this.qteGot < q) this.ui.fillStyle(0x1c1226, 0.8).fillRect(138, 40, 204, 10).fillStyle(0xf2c14e, 1).fillRect(140, 42, 200 * this.qteGot / q, 6);
+    }
     if (done && Math.floor(this.T * 3) % 2) this.ui.fillStyle(0xf2c14e, 1).fillTriangle(455, 250, 463, 250, 459, 255);
   }
 }

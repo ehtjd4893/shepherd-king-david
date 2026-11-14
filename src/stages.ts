@@ -5,11 +5,13 @@ export type Next = { scene: 'cutscene'; id: string } | { scene: 'title' };
 /** On-screen tip shown once when David passes world x `at`. */
 export interface Hint { at: number; pc: string; touch: string }
 export interface StageDef {
-  title: string; width: number; bg: 'field' | 'elah' | 'gibeah'; sheep: number; sections: Section[]; hints: Hint[]; next: Next;
+  title: string; width: number; bg: 'field' | 'elah' | 'gibeah' | 'wild' | 'keilah'; sheep: number; sections: Section[]; hints: Hint[]; next: Next;
   /** David's start x (default 60); stones he starts with (default 5); brook = stones wash up while he's short */
   start?: number; ammo?: number; brook?: boolean;
   /** the faith special becomes the harp (from stage 3) */
   harp?: boolean;
+  /** Goliath's sword in hand (stage 4 on) / Adullam companions can be called */
+  sword?: boolean; allies?: boolean;
 }
 
 // Spawn x is screen-relative (<0 / >480 = walks in from that side). t = enemy kind (default philA).
@@ -103,5 +105,30 @@ export const STAGES: Record<string, StageDef> = {
       { at: 1920, waves: [[{ x: 430, y: 196, t: 'saul' }]] },
     ],
     next: { scene: 'cutscene', id: 'escape' },
+  },
+  keilah: {
+    title: 'STAGE 4 · 그일라',
+    width: 2400,
+    bg: 'keilah',
+    sheep: 0,
+    harp: true,
+    sword: true,
+    allies: true,
+    hints: [
+      { at: 0, pc: '골리앗의 칼! 공격이 세고 길어졌다 · G 동료 호출: 아둘람 용사들이 돌진한다', touch: '골리앗의 칼! 공격이 세고 길어졌다 · 동료 버튼: 아둘람 용사들이 돌진한다' },
+      { at: 1940, pc: '대장이 방패를 들고 웅크리면 붉은 선! 돌진을 옆으로 피하세요', touch: '대장이 방패를 들고 웅크리면 붉은 선! 돌진을 옆으로 피하세요' },
+    ],
+    sections: [
+      { at: 0, waves: [[{ x: 520, y: 200 }, { x: 540, y: 232 }, { x: 560, y: 214, t: 'philD' }]] },
+      {
+        at: 640, waves: [
+          [{ x: 520, y: 190, t: 'philB' }, { x: 560, y: 226, t: 'philD' }, { x: -40, y: 210 }],
+          [{ x: 520, y: 236, t: 'philC' }, { x: 560, y: 196, t: 'philD' }, { x: -40, y: 222 }, { x: 540, y: 206, t: 'philB' }],
+        ],
+      },
+      { at: 1280, waves: [[{ x: 520, y: 190, t: 'philD' }, { x: 540, y: 220 }, { x: -40, y: 206, t: 'philB' }, { x: -60, y: 238, t: 'philC' }]] },
+      { at: 1920, waves: [[{ x: 520, y: 210, t: 'captain' }, { x: 560, y: 186 }, { x: -40, y: 236 }]] },
+    ],
+    next: { scene: 'cutscene', id: 'keilahAfter' },
   },
 };
