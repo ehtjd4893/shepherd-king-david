@@ -1,19 +1,39 @@
 import Phaser from 'phaser';
 import { isDoubleTap } from './combat.ts';
 
+/**
+ * Touch buttons live in the page (not in the 480×270 game canvas), so they are sized in real screen pixels
+ * — big enough for a thumb on a phone — and can sit over the letterbox bars beside the game.
+ * Position: distance from the bottom-right corner; size: diameter in CSS px.
+ */
 const BTN = {
-  attack: { x: 436, y: 226, r: 20, label: '공격', gold: true },
-  jump: { x: 392, y: 249, r: 14, label: '점프', gold: false },
-  sling: { x: 394, y: 203, r: 14, label: '물매', gold: false },
-  special: { x: 446, y: 180, r: 14, label: '믿음', gold: true },
-  spin: { x: 350, y: 244, r: 14, label: '회전', gold: false },
-  ally: { x: 398, y: 160, r: 13, label: '동료', gold: false },
+  attack: { right: 18, bottom: 20, size: 92, label: '공격', gold: true },
+  jump: { right: 124, bottom: 14, size: 68, label: '점프', gold: false },
+  spin: { right: 208, bottom: 18, size: 60, label: '회전', gold: false },
+  sling: { right: 118, bottom: 96, size: 64, label: '물매', gold: false },
+  special: { right: 26, bottom: 124, size: 64, label: '믿음', gold: true },
+  ally: { right: 196, bottom: 96, size: 58, label: '동료', gold: false },
 } as const;
 type BtnName = keyof typeof BTN;
+const STICK_R = 50; // px the thumb travels for a full push
+
+const CSS = `
+.tc{position:fixed;inset:0;pointer-events:none;z-index:10;touch-action:none;user-select:none;-webkit-user-select:none;font-family:"Do Hyeon","Apple SD Gothic Neo",sans-serif}
+.tc-zone{position:absolute;left:0;top:0;bottom:0;width:50%;pointer-events:auto}
+.tc-base{position:absolute;width:${STICK_R * 2 + 28}px;height:${STICK_R * 2 + 28}px;margin:-${STICK_R + 14}px 0 0 -${STICK_R + 14}px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.5);background:rgba(255,255,255,.08);pointer-events:none}
+.tc-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 0 2px rgba(28,18,38,.6)}
+.tc-btn{position:absolute;display:grid;place-items:center;border-radius:50%;pointer-events:auto;touch-action:none;color:#fff;font-size:17px;
+  background:rgba(28,18,38,.5);border:2.5px solid rgba(255,255,255,.75);text-shadow:0 1px 0 #1c1226}
+.tc-btn.gold{border-color:#f2c14e}
+.tc-btn.down{background:rgba(242,193,78,.55);transform:scale(.94)}
+.tc-btn.ready{box-shadow:0 0 0 4px #ffe27a,0 0 14px #ffe27a}
+`;
 
 /**
  * Keyboard, touch and gamepad folded into one input state, read once per frame.
  * Keys: arrows/WASD move (double-tap ←/→ to run), Z/J attack, X/K jump, C/L sling, Z+X or F spin, V/; special, G call companions.
+ * Touch: thumb anywhere on the left half = joystick (push to the edge to run), buttons on the right.
  */
 export class Controls {
   x = 0;
@@ -29,12 +49,9 @@ export class Controls {
 
   private keys: Record<string, Phaser.Input.Keyboard.Key>;
   private prevPad = { a: false, x: false, b: false, y: false, r: false, l: false };
-  private stick: { id: number; ox: number; oy: number; x: number; y: number } | null = null;
+  private stick: { id: number; x: number; y: number } | null = null;
   private touched: Partial<Record<BtnName, boolean>> = {};
-  private knob?: Phaser.GameObjects.Arc;
-  private specialRing?: Phaser.GameObjects.Arc;
-  private btnObjs: Partial<Record<BtnName, Phaser.GameObjects.GameObject[]>> = {};
-  private hidden = new Set<BtnName>();
+  private btns: Partial<Record<BtnName, HTMLElement>> = {};
   private lastTap = { dir: 0, at: -1 };
   private prevX = 0;
 
@@ -44,42 +61,66 @@ export class Controls {
   }
 
   /** Lights the special button when the faith gauge is full. */
-  setSpecialReady(ready: boolean) { this.specialRing?.setVisible(ready); }
+  setSpecialReady(ready: boolean) { this.btns.special?.classList.toggle('ready', ready); }
 
   /** Hide a touch button the current stage doesn't use (e.g. companions before Adullam). */
   setButton(name: BtnName, on: boolean) {
-    if (on) this.hidden.delete(name); else this.hidden.add(name);
-    for (const o of this.btnObjs[name] ?? []) (o as Phaser.GameObjects.Arc).setVisible(on);
+    const b = this.btns[name];
+    if (b) b.style.display = on ? '' : 'none';
   }
 
   private buildTouch() {
-    const s = this.scene;
-    s.input.addPointer(2);
-    const ui = <T extends Phaser.GameObjects.Components.ScrollFactor & Phaser.GameObjects.Components.Depth>(o: T) => o.setScrollFactor(0).setDepth(1000);
-    ui(s.add.circle(56, 222, 30, 0xffffff, 0.08).setStrokeStyle(1.5, 0xffffff, 0.55));
-    this.knob = ui(s.add.circle(56, 222, 12, 0xffffff, 0.5)).setDepth(1001);
-    for (const [name, b] of Object.entries(BTN) as [BtnName, (typeof BTN)[BtnName]][]) {
-      this.btnObjs[name] = [
-        ui(s.add.circle(b.x, b.y, b.r, 0x1c1226, 0.45).setStrokeStyle(1.5, b.gold ? 0xf2c14e : 0xffffff, 0.8)),
-        ui(s.add.text(b.x, b.y, b.label, { fontFamily: '"Do Hyeon", sans-serif', fontSize: '9px', color: '#ffffff' }).setOrigin(0.5)).setDepth(1001),
-      ];
+    if (!document.getElementById('tc-style')) {
+      const st = document.createElement('style');
+      st.id = 'tc-style'; st.textContent = CSS;
+      document.head.appendChild(st);
     }
-    this.specialRing = ui(s.add.circle(BTN.special.x, BTN.special.y, BTN.special.r + 3).setStrokeStyle(2, 0xffe27a, 1)).setVisible(false);
+    const root = document.createElement('div');
+    root.className = 'tc';
+    const zone = document.createElement('div'), base = document.createElement('div'), knob = document.createElement('div');
+    zone.className = 'tc-zone'; base.className = 'tc-base'; knob.className = 'tc-knob';
+    base.appendChild(knob);
+    root.append(zone, base);
+    const rest = () => { base.style.left = `calc(${STICK_R + 30}px + env(safe-area-inset-left, 0px))`; base.style.top = `calc(100% - ${STICK_R + 34}px)`; knob.style.transform = ''; };
+    rest();
 
-    s.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (p.x < 240) { this.stick = { id: p.id, ox: p.x, oy: p.y, x: 0, y: 0 }; return; }
-      for (const [name, b] of Object.entries(BTN) as [BtnName, (typeof BTN)[BtnName]][])
-        if (!this.hidden.has(name) && Phaser.Math.Distance.Between(p.x, p.y, b.x, b.y) < b.r + 6) { this.touched[name] = true; return; }
+    // floating joystick: it starts wherever the thumb lands on the left half
+    let ox = 0, oy = 0;
+    zone.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      ox = e.clientX; oy = e.clientY;
+      base.style.left = `${ox}px`; base.style.top = `${oy}px`;
+      this.stick = { id: e.pointerId, x: 0, y: 0 };
+      // keep getting moves if the thumb slides off the zone; the stick still works if capture is refused
+      try { zone.setPointerCapture(e.pointerId); } catch { /* see above */ }
     });
-    s.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (!this.stick || p.id !== this.stick.id) return;
-      const dx = p.x - this.stick.ox, dy = p.y - this.stick.oy, m = Math.max(1, Math.hypot(dx, dy) / 24);
-      this.stick.x = dx / 24 / m;
-      this.stick.y = dy / 24 / m;
+    zone.addEventListener('pointermove', e => {
+      if (!this.stick || e.pointerId !== this.stick.id) return;
+      const dx = e.clientX - ox, dy = e.clientY - oy, m = Math.max(1, Math.hypot(dx, dy) / STICK_R);
+      this.stick.x = dx / STICK_R / m; this.stick.y = dy / STICK_R / m;
+      knob.style.transform = `translate(${this.stick.x * STICK_R}px, ${this.stick.y * STICK_R}px)`;
     });
-    s.input.on('pointerup', (p: Phaser.Input.Pointer) => {
-      if (this.stick && p.id === this.stick.id) this.stick = null;
-    });
+    const release = (e: PointerEvent) => { if (this.stick && e.pointerId === this.stick.id) { this.stick = null; rest(); } };
+    zone.addEventListener('pointerup', release);
+    zone.addEventListener('pointercancel', release);
+
+    for (const [name, b] of Object.entries(BTN) as [BtnName, (typeof BTN)[BtnName]][]) {
+      const el = document.createElement('div');
+      el.className = 'tc-btn' + (b.gold ? ' gold' : '');
+      el.textContent = b.label;
+      Object.assign(el.style, {
+        width: `${b.size}px`, height: `${b.size}px`,
+        right: `calc(${b.right}px + env(safe-area-inset-right, 0px))`, bottom: `calc(${b.bottom}px + env(safe-area-inset-bottom, 0px))`,
+      });
+      el.addEventListener('pointerdown', e => { e.preventDefault(); this.touched[name] = true; el.classList.add('down'); });
+      for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, () => el.classList.remove('down'));
+      this.btns[name] = el;
+      root.appendChild(el);
+    }
+    document.body.appendChild(root);
+    // the overlay belongs to this scene only (cutscenes and the title take taps on the canvas)
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => root.remove());
+    this.scene.events.once(Phaser.Scenes.Events.DESTROY, () => root.remove());
   }
 
   update(now: number) {
@@ -107,7 +148,6 @@ export class Controls {
     this.prevX = x;
     this.x = x;
     this.y = y;
-    this.knob?.setPosition(56 + (this.stick?.x ?? 0) * 18, 222 + (this.stick?.y ?? 0) * 18);
 
     const J = Phaser.Input.Keyboard.JustDown;
     const pd = { a: on && pad.A, x: on && pad.X, b: on && pad.B, y: on && pad.Y, r: on && pad.R1 > 0.5, l: on && pad.L1 > 0.5 };

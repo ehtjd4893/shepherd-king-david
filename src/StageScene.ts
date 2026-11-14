@@ -1185,7 +1185,7 @@ export class StageScene extends Phaser.Scene {
     this.texts.boss.setText(boss ? (boss.g ? '골리앗 · 가드 사람, 키 여섯 규빗 한 뼘' : boss.name) : saul ? `사울 왕의 창 · 피한 횟수 ${Math.min(this.saulDodged, SAUL_DODGES)} / ${SAUL_DODGES}` : '');
     this.texts.score.setText('SCORE ' + String(this.score).padStart(7, '0'));
     this.texts.sheep.setText(this.stage.sheep ? `양 ${this.flock.length} / ${this.stage.sheep}` : '');
-    this.texts.ally.setText(!this.stage.allies ? '' : this.allyCd > 0 ? `동료 ${Math.ceil(this.allyCd)}초` : '동료 호출 가능 (G)');
+    this.texts.ally.setText(!this.stage.allies ? '' : this.allyCd > 0 ? `동료 ${Math.ceil(this.allyCd)}초` : (this.sys.game.device.input.touch ? '동료 호출 가능' : '동료 호출 가능 (G)'));
     this.ctl.setSpecialReady(full);
   }
 
