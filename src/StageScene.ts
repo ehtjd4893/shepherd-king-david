@@ -10,6 +10,7 @@ import {
 import { Controls } from './controls.ts';
 import { STAGES, type StageDef } from './stages.ts';
 import { sfx } from './sfx.ts';
+import { writeSave } from './save.ts';
 
 const FLOOR_TOP = 168, FLOOR_BOTTOM = 246, GRAV = 760;
 const WALK_X = 125, WALK_Y = 80, RUN_X = 220, JUMP_V = 240;
@@ -104,6 +105,7 @@ export class StageScene extends Phaser.Scene {
     this.prog = { section: 0, wave: 0, locked: false, done: false };
     this.camX = this.hitstop = this.time0 = this.atkBuf = this.slingCd = 0;
     this.score = (this.registry.get('score') as number) ?? 0;
+    writeSave({ stage: this.stageId, score: this.score }); // continue from here next time
     this.faith = 40;
     this.lastHit = null;
     this.ended = null;
@@ -134,7 +136,7 @@ export class StageScene extends Phaser.Scene {
     this.ctl = new Controls(this);
     this.ctl.setButton('ally', !!this.stage.allies);
     this.buildHud();
-    if (this.stage.title) {
+    if (!this.stage.noBanner) {
       this.texts.banner.setText(this.stage.title).setAlpha(1);
       this.tweens.add({ targets: this.texts.banner, alpha: 0, delay: 1600, duration: 500 });
     }

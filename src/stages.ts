@@ -8,6 +8,8 @@ export interface StageDef {
   title: string; width: number; bg: 'field' | 'elah' | 'gibeah' | 'wild' | 'keilah' | 'ziklag' | 'jebus' | 'zion'; sheep: number; sections: Section[]; hints: Hint[]; next: Next;
   /** David's start x (default 60); stones he starts with (default 5); brook = stones wash up while he's short */
   start?: number; ammo?: number; brook?: boolean;
+  /** skip the stage-title banner at the start */
+  noBanner?: boolean;
   /** the faith special becomes the harp (from stage 3) */
   harp?: boolean;
   /** Goliath's sword in hand (stage 4 on) / Adullam companions can be called */
@@ -69,7 +71,8 @@ export const STAGES: Record<string, StageDef> = {
     next: { scene: 'cutscene', id: 'goliath' },
   },
   goliath: {
-    title: '', // the cutscene just introduced him; his name bar does the rest
+    title: '결전 · 골리앗',
+    noBanner: true, // the cutscene just introduced him; his name bar does the rest
     width: 480,
     bg: 'elah',
     sheep: 0,
