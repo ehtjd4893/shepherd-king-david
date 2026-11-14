@@ -1,0 +1,104 @@
+// Story scenes. Lines paraphrase 1 Samuel in plain Korean; chapter:verse goes in narration only.
+
+/** A figure on stage. `from` = walk in from this x when the line starts; k = size (Goliath is big); down = lying on the ground. */
+export interface Actor { id: string; x: number; y: number; anim?: string; flip?: boolean; from?: number; k?: number; down?: boolean }
+/** One line. `actors` replaces who is on stage (omit to keep the previous set). */
+export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint' }
+export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'dark'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } }
+
+export const NAMES = { samuel: '사무엘', saul: '사울', jesse: '이새', david: '다윗', goliath: '골리앗', jonathan: '요나단', michal: '미갈' } as const;
+
+const SAMUEL = { id: 'samuel', x: 176, y: 192 };
+const SAUL = { id: 'saul', x: 292, y: 194, flip: true };
+const FAMILY = [
+  { id: 'bro1', x: 52, y: 160 }, { id: 'bro2', x: 74, y: 158 }, { id: 'bro3', x: 98, y: 161 }, { id: 'bro4', x: 156, y: 159 },
+  { id: 'jesse', x: 122, y: 178 },
+];
+const GOLIATH = { id: 'goliath', x: 380, y: 190, flip: true, k: 1.6, anim: 'laugh' };
+const FLOCK = (x: number) => [{ id: 'sheep', x: x + 40, y: 186, flip: true }, { id: 'sheep', x: x + 62, y: 176, flip: true }, { id: 'sheep', x: x + 82, y: 191, flip: true }];
+
+export const CUTSCENES: Record<string, Cutscene> = {
+  prologue: {
+    bg: 'field',
+    title: '목동왕 다윗',
+    beats: [
+      { text: '사사 시대가 저물 무렵, 이스라엘 백성은 다른 나라들처럼 왕을 원했다. (삼상 8:5)', actors: [SAMUEL] },
+      { text: '사무엘은 베냐민 사람 사울에게 기름을 부었다. 누구보다 어깨 위만큼 키가 큰 사람이었다. (삼상 10:1)', actors: [SAMUEL, SAUL] },
+      { who: 'saul', text: '블레셋이 몰려오는데 사무엘이 늦는구려. 기다릴 수 없소, 내가 직접 번제를 드리겠소!' },
+      { who: 'samuel', text: '왕께서 어리석은 일을 하셨소. 여호와의 명령을 지키지 않으셨구려. (삼상 13:13)' },
+      { text: '아말렉과 싸울 때도 사울은 좋은 것들을 남겨 두었다. 이번에도 순종하지 않은 것이다. (삼상 15:9)' },
+      { who: 'samuel', text: '순종하는 것이 제사보다 낫습니다. 왕이 여호와의 말씀을 버렸으니, 여호와께서도 왕을 버리셨소.' },
+      { text: '여호와께서 사무엘에게 말씀하셨다. "베들레헴 사람 이새에게로 가라. 그 아들 가운데 왕을 보았다." (삼상 16:1)', actors: [SAMUEL] },
+      { text: '그 무렵, 베들레헴 들판에서는 이새의 막내아들이 양 떼를 지키고 있었다.', actors: [{ id: 'david', x: 240, y: 196 }, ...FLOCK(170)] },
+    ],
+    next: { scene: 'stage', id: 'field' },
+  },
+  anoint: {
+    bg: 'beth',
+    beats: [
+      { text: '베들레헴, 이새의 집. 사무엘은 이새의 아들들을 한 사람씩 만나 보았다.', actors: [...FAMILY, { ...SAMUEL, x: 200, y: 184, flip: true }] },
+      { who: 'samuel', text: '여호와께서 이들 가운데 아무도 택하지 않으셨소. 아들이 이들뿐이오?' },
+      { who: 'jesse', text: '막내가 하나 더 있긴 합니다만… 지금 들에서 양을 치고 있지요.' },
+      { who: 'david', text: '헉, 헉… 사자랑 곰까지 쫓아내고 양들 데리고 뛰어왔어요! 무슨 일이세요?', actors: [...FAMILY, { ...SAMUEL, x: 200, y: 184 }, { id: 'david', x: 290, y: 188, flip: true, from: 420 }, ...FLOCK(290)] },
+      { who: 'samuel', text: '사람은 겉모습을 보지만, 여호와께서는 마음을 보신다. (삼상 16:7)' },
+      { who: 'samuel', text: '바로 이 아이다. 무릎을 꿇어라, 다윗.', fx: 'anoint', actors: [...FAMILY, { id: 'samuel', x: 218, y: 186, anim: 'anoint' }, { id: 'david', x: 240, y: 188, anim: 'kneel', flip: true }, ...FLOCK(290)] },
+      { text: '그날부터 여호와의 영이 다윗에게 크게 임하였다. (삼상 16:13)' },
+      { text: '얼마 뒤, 블레셋 군대가 엘라 골짜기에 진을 쳤다. 다윗의 형들도 사울의 군대에 있었다. (삼상 17:1-13)', actors: [] },
+    ],
+    next: { scene: 'stage', id: 'elah' },
+  },
+  goliath: {
+    bg: 'elah',
+    beats: [
+      { text: '블레셋 진영에서 거인이 걸어 나왔다. 키가 여섯 규빗 한 뼘, 가드 사람 골리앗이었다. (삼상 17:4)', actors: [GOLIATH] },
+      { who: 'goliath', text: '이스라엘아, 사내가 있거든 하나 내보내라! 나를 이기면 우리가 너희 종이 되어 주마! (삼상 17:9)' },
+      { text: '사십 일 동안 아침저녁으로 조롱이 이어졌지만, 사울과 이스라엘 군대는 두려워 떨기만 했다. (삼상 17:11, 16)' },
+      { who: 'david', text: '저 블레셋 사람이 누구길래 살아 계신 하나님의 군대를 모욕한단 말입니까? 제가 나가 싸우겠습니다!', actors: [{ id: 'saul', x: 180, y: 188 }, { id: 'david', x: 250, y: 190, flip: true }] },
+      { who: 'saul', text: '너는 소년이고, 저자는 어려서부터 용사였다. 네가 어찌 이기겠느냐? (삼상 17:33)' },
+      { who: 'david', text: '사자와 곰의 발톱에서 저를 건지신 여호와께서 저 블레셋 사람의 손에서도 건지실 겁니다. (삼상 17:37)' },
+      { who: 'saul', text: '그렇다면 가거라. 여호와께서 너와 함께하시기를. 내 놋 투구와 갑옷을 입고 가거라.' },
+      { who: 'david', text: '으윽… 너무 무거워서 한 걸음도 못 걷겠어요. 이건 익숙하지 않아요. (삼상 17:39)' },
+      { text: '다윗은 갑옷을 벗고, 막대기를 들고, 시냇가에서 매끄러운 돌 다섯 개를 골라 주머니에 넣었다. (삼상 17:40)', actors: [{ id: 'david', x: 220, y: 190 }] },
+      { who: 'goliath', text: '막대기를 들고 오다니, 내가 개냐? 이리 와라. 네 살을 새와 들짐승에게 주겠다! (삼상 17:43-44)', actors: [{ id: 'david', x: 150, y: 190 }, { ...GOLIATH, x: 360 }] },
+      { who: 'david', text: '너는 칼과 창으로 오지만, 나는 만군의 여호와의 이름으로 간다! 전쟁은 여호와께 속한 것이다! (삼상 17:45-47)' },
+    ],
+    next: { scene: 'stage', id: 'goliath' },
+  },
+  victory: {
+    bg: 'elah',
+    beats: [
+      { text: '돌이 이마에 박히자, 거인은 땅에 얼굴을 박고 쓰러졌다. 다윗의 손에는 칼이 없었다. (삼상 17:49-50)', actors: [{ ...GOLIATH, x: 330, y: 186, down: true }, { id: 'david', x: 230, y: 190 }] },
+      { text: '블레셋 사람들은 자기들의 용사가 죽은 것을 보고 도망쳤고, 이스라엘이 함성을 지르며 뒤쫓았다. (삼상 17:51-52)' },
+      { who: 'saul', text: '소년아, 너는 누구의 아들이냐? (삼상 17:58)', actors: [{ id: 'saul', x: 170, y: 188 }, { id: 'jonathan', x: 130, y: 184 }, { id: 'david', x: 250, y: 190, flip: true }] },
+      { who: 'david', text: '베들레헴 사람, 주의 종 이새의 아들입니다.' },
+      { text: '그날 사울의 아들 요나단의 마음이 다윗과 하나가 되었다. 요나단은 다윗을 자기 생명처럼 사랑했다. (삼상 18:1)' },
+      { who: 'jonathan', text: '다윗, 이 겉옷과 칼과 활을 받게. 오늘부터 우리는 형제일세. (삼상 18:3-4)' },
+    ],
+    next: { scene: 'cutscene', id: 'jealousy' },
+  },
+  jealousy: {
+    bg: 'gibeah',
+    beats: [
+      { text: '다윗이 돌아오자 여인들이 소고를 치며 노래했다. "사울이 죽인 자는 천천이요, 다윗은 만만이로다!" (삼상 18:7)', actors: [{ id: 'saul', x: 330, y: 188, flip: true }, { id: 'david', x: 200, y: 190 }] },
+      { who: 'saul', text: '다윗에게는 만만을 돌리고 내게는 천천만 돌리는구나… 이제 그에게 더 돌아갈 것은 나라밖에 없겠구나. (삼상 18:8)' },
+      { text: '그날부터 사울은 다윗을 의심의 눈으로 지켜보았다. (삼상 18:9)' },
+      { text: '사울의 마음이 어두워질 때면 다윗이 수금을 탔다. 그러면 사울의 마음이 상쾌해졌다. (삼상 16:23)', actors: [{ id: 'saul', x: 330, y: 188, flip: true }, { id: 'david', x: 220, y: 190, anim: 'harp' }] },
+      { text: '그러나 어느 날, 수금을 듣는 사울의 손에 창이 들려 있었다. (삼상 18:10)' },
+      { who: 'jonathan', text: '다윗, 아버지가 자네를 해치려 하네. 몸을 조심하게! (삼상 19:2)', actors: [{ id: 'jonathan', x: 260, y: 186, flip: true }, { id: 'david', x: 200, y: 190 }] },
+      { text: '다시 블레셋과 전쟁이 일어나자, 다윗은 천부장이 되어 블레셋을 치러 나갔다. (삼상 18:13, 19:8)', actors: [] },
+    ],
+    next: { scene: 'stage', id: 'gibeah' },
+  },
+  escape: {
+    bg: 'gibeah',
+    beats: [
+      { text: '창이 벽에 박혔다. 다윗은 사울 앞을 피해 그 밤에 집으로 달아났다. (삼상 19:10)', actors: [{ id: 'david', x: 180, y: 190 }] },
+      { who: 'michal', text: '오늘 밤 피하지 않으면 내일은 죽어요! 창문으로 내려가요, 어서! (삼상 19:11)', actors: [{ id: 'michal', x: 260, y: 186, flip: true }, { id: 'david', x: 200, y: 190 }] },
+      { text: '미갈은 다윗을 창문으로 달아 내리고, 침상에 우상을 눕힌 뒤 염소털을 씌웠다. (삼상 19:12-13)' },
+      { text: '사울의 부하들이 들이닥쳤지만, 이불 속에는 염소털 베개만 있었다.', actors: [{ id: 'michal', x: 260, y: 186, flip: true }] },
+      { text: '다윗은 라마에 있는 사무엘에게로 피했다. 쫓기는 도망자의 길이 시작되었다. (삼상 19:18)', actors: [{ id: 'samuel', x: 260, y: 188, flip: true }, { id: 'david', x: 200, y: 190 }] },
+      { text: '다음 이야기: 도피의 길 (준비 중)', actors: [] },
+    ],
+    next: { scene: 'title' },
+  },
+};
