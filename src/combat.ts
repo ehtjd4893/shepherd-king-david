@@ -174,24 +174,6 @@ export function swordify(a: Attack): Attack {
 export const ALLY_COOLDOWN = 12, ALLY_SPEED = 260;
 export const ALLY_RUSH: Attack = { pose: 'walk', dur: 0, active: [0, 0], box: { from: -10, to: 12, height: 40 }, dmg: 12, knock: true, lunge: 0 };
 
-// ---------- Stealth (1 Sam 24, 26) ----------
-export const SIGHT_RANGE = 110, HEAR_RANGE = 60;
-/** A patrolling guard sees a cone in front of him that widens with distance (and anyone bumping into him). */
-export function seen(g: { x: number; y: number; facing: 1 | -1 }, t: { x: number; y: number }): boolean {
-  const dx = (t.x - g.x) * g.facing, dy = Math.abs(t.y - g.y);
-  if (Math.abs(t.x - g.x) < 14 && dy < 10) return true;
-  return dx >= 0 && dx <= SIGHT_RANGE && dy <= 8 + dx * 0.22;
-}
-/** Sleepers (1 Sam 26:12) only stir if David runs close by. */
-export function heard(g: { x: number; y: number }, t: { x: number; y: number }, running: boolean): boolean {
-  return running && Math.hypot(t.x - g.x, (t.y - g.y) * 2) <= HEAR_RANGE;
-}
-/** Suspicion fills while sensed and drains otherwise; at 1 David is caught. Gives kids a moment to back off. */
-export const SIGHT_RATE = 1.8, HEAR_RATE = 3.2; // footsteps wake a sleeper faster than a glimpse alarms a guard
-export function suspicion(meter: number, sensed: boolean, dt: number, rate = SIGHT_RATE): number {
-  return Math.min(1, Math.max(0, meter + (sensed ? rate : -1) * dt));
-}
-
 // ---------- Ziklag (1 Sam 30) ----------
 /** Camel riders wait at the screen edge with a warning line over their lane, then gallop across it. */
 export const CAMEL_WARN = 0.9, CAMEL_SPEED = 280;

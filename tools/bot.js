@@ -17,15 +17,14 @@ export function tap(k) { key(k, true); run(1); key(k, false); }
 function hold(k, on) { if (!!held[k] !== on) { key(k, on); held[k] = on; } }
 export const scenes = () => window.game.scene.getScenes(true).map(s => s.sys.settings.key).join();
 
-let C = null;
-export async function setup() { C = await import('/src/combat.ts'); window.game.loop.sleep(); T = performance.now(); run(10); }
+let ST = null;
+export async function setup() { ST = await import('/src/stealth.ts'); window.game.loop.sleep(); T = performance.now(); run(10); }
 
 /** Play the current stage. god: keep David alive (flow check); returns what happened. */
 export function play({ god = false, seconds = 240 } = {}) {
   const s = window.game.scene.getScene('stage'), p = s.player;
   if (god) p.hp = p.maxHp = 5000;
   const log = [], ev = { hitsTaken: 0, deaths: 0, specials: 0, slings: 0, allies: 0, caught: 0 };
-  const caught0 = s.caught.bind(s); s.caught = () => { ev.caught++; return caught0(); };
   let last = JSON.stringify(s.prog), hp = p.hp, f = 0;
   for (; f < 60 * seconds && !s.ended; f++) {
     const live = s.enemies.filter(e => e.state !== 'dead' && e.state !== 'down' && !e.flee && !s.def(e).untouchable);
@@ -39,7 +38,7 @@ export function play({ god = false, seconds = 240 } = {}) {
     const st = s.stealthRun, goal = st?.goals.find(g => !g.done);
     if (goal) {
       // sneak: head for the goal, sidestep anything a guard would see, never run near sleepers
-      const gx = st.at + goal.g.x, gy = goal.g.y, risky = (x, y) => st.sentries.some(se => !se.g.asleep && C.seen(se, { x, y }));
+      const gx = st.at + goal.g.x, gy = goal.g.y, risky = (x, y) => st.sentries.some(se => !se.g.asleep && ST.seen(se, { x, y }));
       dx = Math.abs(gx - p.x) > 6 ? Math.sign(gx - p.x) : 0; dy = Math.abs(gy - p.y) > 4 ? Math.sign(gy - p.y) : 0;
       if (risky(p.x + dx * 18, p.y + dy * 10) || st.sentries.some(se => se.meter > 0.15)) {
         if (!risky(p.x - 18, p.y)) { dx = -1; dy = 0; } else if (!risky(p.x, p.y + 20)) { dx = 0; dy = 1; } else if (!risky(p.x, p.y - 20)) { dx = 0; dy = -1; } else { dx = 0; dy = 0; }
@@ -78,6 +77,7 @@ export function play({ god = false, seconds = 240 } = {}) {
     else if (!s.prog.locked) dx = 1;
     hold('ArrowRight', dx > 0); hold('ArrowLeft', dx < 0); hold('ArrowDown', dy > 0); hold('ArrowUp', dy < 0);
     if (k) key(k, true); run(1); if (k) key(k, false);
+    if (s.stealthEvents.some(e => e.type === 'caught')) ev.caught++;
     if (k === 'c') ev.slings++;
     if (p.hp < hp) ev.hitsTaken++; hp = p.hp;
     if (p.state === 'dead') { ev.deaths++; break; }

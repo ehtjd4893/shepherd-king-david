@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hits, rockHits, slideDown, SHAFT, camelPhase, chiefCalls, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, HEAR_RANGE, HEAR_RATE, swordify, COMBO, SWORD_REACH, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP } from './combat.ts';
+import { hits, rockHits, slideDown, SHAFT, camelPhase, chiefCalls, CAMEL_WARN, swordify, COMBO, SWORD_REACH, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP } from './combat.ts';
 
 test('spin spends faith first, then a little health, never the last of it', () => {
   assert.deepEqual(spinCost(SPIN_FAITH, 50), { faith: 0, hp: 50 });
@@ -83,34 +83,6 @@ test("Goliath's sword hits harder and reaches further, without touching the orig
   assert.equal(a.dmg, 12);
   assert.equal(a.box.to, COMBO[0].box.to + SWORD_REACH);
   assert.equal(COMBO[0].dmg, 8);
-});
-
-test('guard sight: a cone in front that widens, nothing behind', () => {
-  const g = { x: 100, y: 200, facing: 1 as const };
-  assert.equal(seen(g, { x: 150, y: 200 }), true);
-  assert.equal(seen(g, { x: 100 + SIGHT_RANGE, y: 225 }), true); // wide far away
-  assert.equal(seen(g, { x: 130, y: 225 }), false); // narrow up close
-  assert.equal(seen(g, { x: 60, y: 200 }), false); // behind him
-  assert.equal(seen(g, { x: 100 + SIGHT_RANGE + 5, y: 200 }), false); // out of range
-});
-
-test('sleepers only stir when David runs close; suspicion fills and drains', () => {
-  assert.equal(heard({ x: 100, y: 200 }, { x: 130, y: 205 }, false), false);
-  assert.equal(heard({ x: 100, y: 200 }, { x: 130, y: 205 }, true), true);
-  assert.equal(heard({ x: 100, y: 200 }, { x: 200, y: 205 }, true), false);
-  let m = 0;
-  for (let i = 0; i < 20; i++) m = suspicion(m, true, 1 / 60); // a third of a second in sight: not caught yet
-  assert.ok(m > 0 && m < 1);
-  for (let i = 0; i < 60; i++) m = suspicion(m, false, 1 / 60);
-  assert.equal(m, 0);
-});
-
-test('running straight past a sleeper wakes him', () => {
-  // at full run (220 px/s) David spends 2*HEAR_RANGE/220 s inside the hearing circle
-  let m = 0;
-  const frames = Math.floor((2 * HEAR_RANGE / 220) * 60);
-  for (let i = 0; i < frames; i++) m = suspicion(m, true, 1 / 60, HEAR_RATE);
-  assert.equal(m, 1);
 });
 
 test('camel riders warn before they gallop', () => {

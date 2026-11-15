@@ -4,11 +4,12 @@ import {
   bgElah, bgField, bgGibeah, bgWild, bgKeilah, bgZiklag, bgJebus, bgZion, KB, frame, bar, R, D, C,
 } from './art.ts';
 import {
-  hits, spinCost, brookShouldDrop, archerStep, swordify, camelPhase, CAMEL_SPEED, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, SIGHT_RATE, HEAR_RATE, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
-  SPECIAL_DMG, FAITH_MAX, STONE_MAX, type Attack, type Spawn, type EnemyId, type EnemyDef, type Section, type Guard, type Goal, type Captive,
+  hits, spinCost, brookShouldDrop, archerStep, swordify, camelPhase, CAMEL_SPEED, CAMEL_WARN, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
+  SPECIAL_DMG, FAITH_MAX, STONE_MAX, type Attack, type Spawn, type EnemyId, type EnemyDef, type Section, type Captive,
 } from './combat.ts';
 import { resolveHit, standing, vulnerable, hittable, type HitOutcome } from './hit.ts';
 import { advance, startAt, cameraTarget, betweenFights, verdict, type Prog } from './progress.ts';
+import { startStealth, stepStealth, entry, SIGHT_RANGE, type StealthRun, type StealthEvent } from './stealth.ts';
 import { Controls } from './controls.ts';
 import { STAGES, type StageDef } from './stages.ts';
 import { sfx } from './sfx.ts';
@@ -44,9 +45,8 @@ interface Stone { x: number; y: number; z: number; dir: 1 | -1; img: Phaser.Game
 interface Shot { x: number; y: number; z: number; dir: 1 | -1; speed: number; dmg: number; knock: boolean; spear: boolean; passed: boolean; img: Phaser.GameObjects.Image }
 /** Adullam companion charging across the screen. */
 interface Rusher { id: string; x: number; y: number; hitSet: Set<Fighter>; spr: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }
-/** One of Saul's men in a stealth section: patrols with a sight cone, or sleeps and only hears running. */
-interface Sentry { g: Guard; x: number; y: number; facing: 1 | -1; wait: number; meter: number; spr: Phaser.GameObjects.Image; mark: Phaser.GameObjects.Text }
-interface StealthRun { at: number; sentries: Sentry[]; goals: { g: Goal; done: boolean; marks: Phaser.GameObjects.GameObject[] }[]; grace: number; extras: Phaser.GameObjects.GameObject[] }
+/** What the scene draws for a stealth section (the state itself is a StealthRun): a sprite and a ?/! mark per guard, the marks over each goal. */
+interface StealthView { sentries: { spr: Phaser.GameObjects.Image; mark: Phaser.GameObjects.Text }[]; goals: Phaser.GameObjects.GameObject[][] }
 /** A captive in the Amalekite camp, freed by walking up and pressing attack. */
 interface Bound { c: Captive; x: number; done: boolean; img: Phaser.GameObjects.Image; rope: Phaser.GameObjects.Graphics; arrow: Phaser.GameObjects.Text }
 interface Pickup { x: number; y: number; t: number; img: Phaser.GameObjects.Image; arrow: Phaser.GameObjects.Text }
@@ -74,6 +74,8 @@ export class StageScene extends Phaser.Scene {
   private rushers: Rusher[] = [];
   private allyCd = 0;
   private stealthRun: StealthRun | null = null;
+  private stealthView: StealthView | null = null;
+  private stealthEvents: StealthEvent[] = []; // this frame's (the dev bot counts catches from these)
   private bound: Bound[] = [];
   private shade!: Phaser.GameObjects.Rectangle;
   private saulDodged = 0;
@@ -104,7 +106,7 @@ export class StageScene extends Phaser.Scene {
     this.stage = STAGES[this.stageId];
     this.enemies = []; this.stones = []; this.pickups = []; this.flock = [];
     this.ammo = this.stage.ammo ?? STONE_MAX; this.kos = 0; this.sheepLost = 0; this.hintsShown = 0;
-    this.quake = null; this.bubble = null; this.brookT = 0; this.shots = []; this.saulDodged = 0; this.royalWarnAt = -9; this.rushers = []; this.allyCd = 0; this.stealthRun = null; this.bound = [];
+    this.quake = null; this.bubble = null; this.brookT = 0; this.shots = []; this.saulDodged = 0; this.royalWarnAt = -9; this.rushers = []; this.allyCd = 0; this.stealthRun = null; this.stealthView = null; this.bound = [];
     this.spinRing = null;
     this.hitstop = this.time0 = this.atkBuf = this.slingCd = 0;
     const start = startAt(this.stage, this.startSection);
@@ -562,7 +564,7 @@ export class StageScene extends Phaser.Scene {
 
   /* ---------- Stealth: En-gedi cave, Ziph camp (1 Sam 24, 26) ---------- */
   private setupStealth(sec: Section) {
-    const st = sec.stealth!, at = sec.at, extras: Phaser.GameObjects.GameObject[] = [];
+    const st = sec.stealth!, at = sec.at;
     this.shade.setFillStyle(st.mood === 'night' ? 0x0a0c30 : 0x1a1008, st.mood === 'night' ? 0.5 : 0.3);
     if (st.mood === 'cave') {
       // rock ceiling with stalactites over the whole section: this is En-gedi's cave, not open desert
@@ -572,85 +574,69 @@ export class StageScene extends Phaser.Scene {
       rock.fillStyle(0x5a4234, 1).fillRect(at, 0, 480, 6);
       for (let x = at + 30; x < at + 480; x += 70) rock.fillStyle(0x2a1e18, 1).fillTriangle(x, 96, x + 10, 96, x + 5, 140);
       rock.fillStyle(0x3a2a24, 1).fillRect(at + 452, 96, 28, 170);
-      extras.push(rock);
     }
     // Saul asleep / resting, never to be harmed
     const sk = this.tex('saul', 'hurt', 0, true), so = this.origins.get(sk)!;
-    extras.push(this.add.image(at + st.saul.x, st.saul.y, sk).setOrigin(so[0], so[1]).setDepth(st.saul.y + 10));
-    extras.push(this.add.text(at + st.saul.x - 10, st.saul.y - 40, 'Zz', { fontFamily: FONT, fontSize: '11px', color: '#ffffff', stroke: '#0d0a14', strokeThickness: 2 }).setDepth(960));
-    const sentries = st.guards.map(g => {
+    this.add.image(at + st.saul.x, st.saul.y, sk).setOrigin(so[0], so[1]).setDepth(st.saul.y + 10);
+    this.add.text(at + st.saul.x - 10, st.saul.y - 40, 'Zz', { fontFamily: FONT, fontSize: '11px', color: '#ffffff', stroke: '#0d0a14', strokeThickness: 2 }).setDepth(960);
+    const run = startStealth(sec), view: StealthView = { sentries: [], goals: [] };
+    for (const { g } of run.sentries) {
       const key = g.asleep ? this.tex('guard', 'hurt', 0, true) : this.tex('guard', 'idle', 0), o = this.origins.get(key)!;
-      if (g.asleep) extras.push(this.add.text(at + g.x - 6, g.y - 30, 'Zz', { fontFamily: FONT, fontSize: '10px', color: '#ffffff', stroke: '#0d0a14', strokeThickness: 2 }).setDepth(960));
-      return {
-        g, x: at + g.x, y: g.y, facing: -1 as 1 | -1, wait: 0, meter: 0,
+      if (g.asleep) this.add.text(at + g.x - 6, g.y - 30, 'Zz', { fontFamily: FONT, fontSize: '10px', color: '#ffffff', stroke: '#0d0a14', strokeThickness: 2 }).setDepth(960);
+      view.sentries.push({
         spr: this.add.image(at + g.x, g.y, key).setOrigin(o[0], o[1]).setDepth(g.y + 10),
         mark: this.add.text(at + g.x, g.y - 70, '', { fontFamily: FONT, fontSize: '16px', color: '#ffe27a', stroke: '#7a2416', strokeThickness: 3 }).setOrigin(0.5).setDepth(960),
-      };
-    });
-    const goals = st.goals.map(g => {
+      });
+    }
+    for (const { g } of run.goals) {
       const x = at + g.x, marks: Phaser.GameObjects.GameObject[] = [];
       if (g.kind === 'spear') marks.push(this.add.image(x, g.y, 'stealthSpear').setOrigin(0.5, 1).setDepth(g.y + 9));
       if (g.kind === 'jug') marks.push(this.add.image(x, g.y, 'jug').setOrigin(0.5, 1).setDepth(g.y + 9));
       marks.push(this.add.text(x, g.y - (g.kind === 'spear' ? 66 : 26), '▼', { fontFamily: FONT, fontSize: '11px', color: '#ffe27a', stroke: '#7a2416', strokeThickness: 2 }).setOrigin(0.5, 1).setDepth(961));
-      return { g, done: false, marks };
-    });
-    this.stealthRun = { at, sentries, goals, grace: 1, extras };
-    // start from the near edge of the section, out of everyone's sight
-    const p = this.player; p.x = at + 30; p.y = 210; p.state = 'idle'; p.vx = 0;
+      view.goals.push(marks);
+    }
+    this.stealthRun = run; this.stealthView = view;
+    const p = this.player, e = entry(run); p.x = e.x; p.y = e.y; p.state = 'idle'; p.vx = 0;
     this.say('살금살금…', p.x, p.y - 70);
   }
 
+  /** The rules live in stepStealth (stealth.ts); this plays the events and draws the guards. */
   private updateStealth(dt: number, T: number) {
-    const run = this.stealthRun, p = this.player;
+    const run = this.stealthRun, v = this.stealthView!, p = this.player;
     if (!run) return;
-    run.grace = Math.max(0, run.grace - dt);
-    for (const s of run.sentries) {
-      if (!s.g.asleep) {
-        // patrol between from..to, pausing to look around at each end
-        if (s.wait > 0) s.wait -= dt;
-        else {
-          s.x += s.facing * 35 * dt;
-          const lo = run.at + (s.g.from ?? s.g.x), hi = run.at + (s.g.to ?? s.g.x);
-          if (s.x <= lo || s.x >= hi) { s.x = Phaser.Math.Clamp(s.x, lo, hi); s.facing = (s.facing * -1) as 1 | -1; s.wait = 1.2; }
-        }
-        const key = this.tex('guard', s.wait > 0 ? 'idle' : 'walk', s.wait > 0 ? Math.floor(T * 2.5) % 2 : Math.floor(T * 6) % 4), o = this.origins.get(key)!;
-        s.spr.setTexture(key).setOrigin(o[0], o[1]).setFlipX(s.facing < 0).setPosition(Math.round(s.x), s.y);
-      }
-      const sensed = run.grace <= 0 && standing(p)
-        && (s.g.asleep ? heard(s, p, p.state === 'run') : seen(s, p));
-      s.meter = suspicion(s.meter, sensed, dt, s.g.asleep ? HEAR_RATE : SIGHT_RATE);
-      s.mark.setPosition(s.x, s.y - (s.g.asleep ? 34 : 70)).setText(s.meter >= 1 ? '!' : s.meter > 0 ? '?' : '').setColor(s.meter > 0.5 ? '#ff7a6a' : '#ffe27a');
-      if (s.meter >= 1) { this.caught(); return; }
-    }
-    // take a goal: walk up to it and press attack
-    for (const g of run.goals) {
-      if (g.done || !this.ctl.attack) continue;
-      const gx = run.at + g.g.x;
-      if (Math.abs(gx - p.x) < 22 && Math.abs(g.g.y - p.y) < 14) {
-        g.done = true;
-        for (const m of g.marks) m.destroy();
-        this.pop({ robe: '옷자락을 베었다!', spear: '사울의 창을 챙겼다!', jug: '물병을 챙겼다!' }[g.g.kind], p.x, p.y - 80, true);
+    const events = this.stealthEvents = stepStealth(run, dt, p, this.ctl.attack);
+    for (const ev of events) {
+      if (ev.type === 'caught') this.caught();
+      else if (ev.type === 'took') {
+        for (const m of v.goals[run.goals.findIndex(g => g.g === ev.goal)]) m.destroy();
+        this.pop({ robe: '옷자락을 베었다!', spear: '사울의 창을 챙겼다!', jug: '물병을 챙겼다!' }[ev.goal.kind], p.x, p.y - 80, true);
         sfx.harp();
       }
     }
-    for (const g of run.goals) if (!g.done) (g.marks[g.marks.length - 1] as Phaser.GameObjects.Text).setY(g.g.y - (g.g.kind === 'spear' ? 66 : 26) - Math.abs(Math.sin(T * 6)) * 4);
-    if (run.goals.every(g => g.done)) {
+    run.sentries.forEach((s, i) => {
+      const { spr, mark } = v.sentries[i];
+      if (!s.g.asleep) {
+        const key = this.tex('guard', s.wait > 0 ? 'idle' : 'walk', s.wait > 0 ? Math.floor(T * 2.5) % 2 : Math.floor(T * 6) % 4), o = this.origins.get(key)!;
+        spr.setTexture(key).setOrigin(o[0], o[1]).setFlipX(s.facing < 0).setPosition(Math.round(s.x), s.y);
+      }
+      mark.setPosition(s.x, s.y - (s.g.asleep ? 34 : 70)).setText(s.meter >= 1 ? '!' : s.meter > 0 ? '?' : '').setColor(s.meter > 0.5 ? '#ff7a6a' : '#ffe27a');
+    });
+    run.goals.forEach((g, i) => { if (!g.done) (v.goals[i][v.goals[i].length - 1] as Phaser.GameObjects.Text).setY(g.g.y - (g.g.kind === 'spear' ? 66 : 26) - Math.abs(Math.sin(T * 6)) * 4); });
+    if (events.some(e => e.type === 'done')) {
       // done: everyone stays asleep / at their post; lift the darkness
       this.shade.setFillStyle(0x000000, 0);
-      for (const s of run.sentries) s.mark.setText('');
-      this.stealthRun = null;
+      for (const s of v.sentries) s.mark.setText('');
+      this.stealthRun = null; this.stealthView = null;
     }
   }
 
-  /** Spotted: back to the start of the section (goals already taken stay taken). No damage. */
+  /** Spotted: back to the start of the section (stepStealth already sent the guards back to their posts). No damage. */
   private caught() {
-    const run = this.stealthRun!, p = this.player;
+    const p = this.player, e = entry(this.stealthRun!);
     this.pop('들켰다!', p.x, p.y - 80, true);
     sfx.bark();
     this.cameras.main.flash(250, 255, 255, 255);
-    p.x = run.at + 30; p.y = 210; p.state = 'idle'; p.vx = 0; p.z = 0; p.vz = 0;
-    for (const s of run.sentries) { s.x = run.at + s.g.x; s.facing = -1; s.wait = 0; s.meter = 0; }
-    run.grace = 1.2;
+    p.x = e.x; p.y = e.y; p.state = 'idle'; p.vx = 0; p.z = 0; p.vz = 0;
     this.tip('들켰다! 다시 살금살금… 노란 시야를 피하고, 잠든 군사 곁에서는 달리지 마세요');
   }
 
@@ -1163,6 +1149,7 @@ export class StageScene extends Phaser.Scene {
     const dt = Math.min(dms / 1000, 0.05);
     this.time0 += dt;
     const T = this.time0;
+    this.stealthEvents = [];
     this.ctl.update(T);
     if (this.ctl.attack) this.atkBuf = 0.2;
 
