@@ -4,9 +4,10 @@ import {
   bgElah, bgField, bgGibeah, bgWild, bgKeilah, bgZiklag, bgJebus, bgZion, KB, frame, bar, R, D, C,
 } from './art.ts';
 import {
-  hits, stepProg, spinCost, reaction, goliathDamage, brookShouldDrop, archerStep, swordify, camelPhase, chiefCalls, CAMEL_SPEED, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, SIGHT_RATE, HEAR_RATE, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
-  SPECIAL_DMG, FAITH_MAX, FAITH_PER_HIT, FAITH_PER_KO, STONE_MAX, type Attack, type Prog, type Spawn, type EnemyId, type EnemyDef, type Section, type Guard, type Goal, type Captive,
+  hits, stepProg, spinCost, brookShouldDrop, archerStep, swordify, camelPhase, CAMEL_SPEED, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, SIGHT_RATE, HEAR_RATE, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
+  SPECIAL_DMG, FAITH_MAX, STONE_MAX, type Attack, type Prog, type Spawn, type EnemyId, type EnemyDef, type Section, type Guard, type Goal, type Captive,
 } from './combat.ts';
+import { resolveHit, standing, vulnerable, hittable, type HitOutcome } from './hit.ts';
 import { Controls } from './controls.ts';
 import { STAGES, type StageDef } from './stages.ts';
 import { sfx } from './sfx.ts';
@@ -199,7 +200,7 @@ export class StageScene extends Phaser.Scene {
 
   private pose(f: Fighter, T: number): [string, number, boolean] {
     const fr2 = Math.floor(T * 2.5) % 2;
-    if (f.g && f.state !== 'down' && f.state !== 'dead') {
+    if (f.g && standing(f)) {
       const m = f.g.mode;
       const P: Record<GMode, [string, number, boolean]> = {
         taunt: ['laugh', Math.floor(T * 4) % 2, false], walk: ['walk', Math.floor(T * 6) % 4, false], tele: ['atkA', 0, false],
@@ -274,46 +275,67 @@ export class StageScene extends Phaser.Scene {
     if (f === this.player) sfx.swing();
   }
 
-  private applyHit(target: Fighter, a: Attack, dir: 1 | -1, heavyFx = false, src: 'staff' | 'stone' = 'staff') {
-    if (target.g) { this.hitGoliath(target, a, dir, src); return; }
-    target.hp -= a.dmg;
-    if (target.kind === 'chief' || target.kind === 'lord') {
-      const n = chiefCalls(target.hp + a.dmg, target.hp);
-      if (n && target.hp > 0) {
-        if (target.kind === 'chief') this.callCamels(n * 2);
-        else { this.spawn([{ x: -40, y: 200, t: 'jebusite' }, { x: 520, y: 230, t: 'jebArcher' }]); this.pop('성주를 지켜라!', this.camX + 240, 90, true); }
+  /** The rules live in resolveHit (hit.ts); this plays what it says happened. */
+  private applyHit(target: Fighter, a: Attack, dir: 1 | -1, special = false, src: 'staff' | 'stone' = 'staff') {
+    const out = resolveHit(target, a, dir, { hitstop: this.hitstop, score: this.score, faith: this.faith }, { special, src });
+    ({ hitstop: this.hitstop, score: this.score, faith: this.faith } = out.m);
+    target.flash = 0.07;
+    if (target !== this.player) this.lastHit = target;
+    const K = KB * 1.6; // Goliath's scale
+    for (const ev of out.events) {
+      switch (ev.type) {
+        case 'reinforce': this.spawn(ev.spawns); this.pop(ev.shout, this.camX + 240, 90, true); break;
+        case 'stoneBounced': this.dropStone(target.x - dir * 34, target.y); break; // bounced off the bronze: pick it up again
+        case 'struck': if (target.g) this.goliathStruck(target, out, dir); else this.struck(target, out, dir); break;
+        case 'sheepDropped': this.say('음매~', ev.x, ev.y - 34); sfx.baa(); break;
+        case 'hint': this.say(ev.text, this.player.x, this.player.y - 70); break;
+        case 'enraged':
+          sfx.roar();
+          this.cameras.main.shake(400, 0.01);
+          this.pop('크아아!!', target.x, target.y - 50 * K, true);
+          this.spawn(ev.spawns);
+          break;
+        case 'goliathDown':
+          this.cameras.main.flash(300, 255, 255, 255);
+          this.cameras.main.shake(600, 0.02);
+          this.pop('골리앗이 쓰러졌다!', target.x, target.y - 70 * K, true);
+          for (const o of this.enemies) if (o !== target && o.state !== 'dead') o.flee = true;
+          this.bubble?.destroy(); this.bubble = null;
+          break;
       }
     }
-    const heavy = a.knock || heavyFx || target.kind === 'camel';
-    const boss = !!(target.kind && this.def(target).boss);
-    const r = reaction(boss, heavy, target.hp <= 0);
-    this.hitstop = Math.max(this.hitstop, r === 'down' ? 0.11 : 0.055);
-    if (boss && target.hp <= 0) this.hitstop = 0.45;
-    target.flash = 0.07;
-    const beast = !!target.kind && isBeast(target.kind);
-    const hx = target.x - dir * 4, hy = target.y - target.z - (beast ? (boss ? 24 : 14) : 26) * KB;
+  }
+
+  private struck(t: Fighter, out: HitOutcome, dir: 1 | -1) {
+    const heavy = out.look === 'heavy', boss = out.boss;
+    const beast = !!t.kind && isBeast(t.kind);
+    const hx = out.at.x - dir * 4, hy = t.y - out.at.z - (beast ? (boss ? 24 : 14) : 26) * KB;
     this.impact(hx, hy, heavy);
-    if (target.carry) this.dropSheep(target);
-    if (r === 'down') {
-      target.facing = (dir * -1) as 1 | -1;
-      target.state = 'down'; target.t = 0; target.vx = dir * (boss ? 90 : 150); target.vz = boss ? 150 : 190; target.z = Math.max(target.z, 1);
-      if (target.ai) target.ai.mode = 'approach';
-      this.cameras.main.shake(boss && target.hp <= 0 ? 400 : 140, boss ? 0.014 : 0.009);
-    } else if (r === 'hurt') {
-      target.facing = (dir * -1) as 1 | -1;
-      if (target.ai?.mode === 'swing') target.ai.mode = 'back';
-      target.state = 'hurt'; target.t = 0; target.vx = dir * (boss ? 60 : 110); target.z = 0; target.vz = 0;
-      this.cameras.main.shake(60, 0.003);
-    } else {
-      target.x += dir * 2; // boss armor: flinch in place, keeps attacking
-    }
-    if (target === this.player) { sfx.hurt(); return; }
+    if (out.reaction === 'down') this.cameras.main.shake(boss && out.ko ? 400 : 140, boss ? 0.014 : 0.009);
+    else if (out.reaction === 'hurt') this.cameras.main.shake(60, 0.003);
+    if (t === this.player) { sfx.hurt(); return; }
     (heavy ? sfx.heavy : sfx.hit)();
     this.pop(heavy ? Phaser.Utils.Array.GetRandom(['빡!!', '콰직!', '쾅!']) : Phaser.Utils.Array.GetRandom(['퍽!', '딱!', '탁!']), hx + dir * 6, hy - 14, heavy);
-    this.score += 100 + (target.hp <= 0 ? (boss ? 5000 : 400) : 0);
-    if (!heavyFx) this.faith = Math.min(FAITH_MAX, this.faith + FAITH_PER_HIT + (target.hp <= 0 ? FAITH_PER_KO : 0)); // the special doesn't refill itself
-    this.lastHit = target;
-    if (boss && target.hp <= 0) this.pop('목자의 승리!', target.x, target.y - 90, true);
+    if (boss && out.ko) this.pop('목자의 승리!', t.x, t.y - 90, true);
+  }
+
+  private goliathStruck(e: Fighter, out: HitOutcome, dir: 1 | -1) {
+    const K = KB * 1.6;
+    if (out.look === 'blocked') {
+      this.impact(e.x - dir * 14, e.y - 24 * K, false);
+      this.pop('팅!', e.x - dir * 20, e.y - 30 * K, false);
+      sfx.clank();
+    } else if (out.look === 'crit') {
+      const fx = e.x + e.facing * 11 * K, fy = e.y - 33 * K; // forehead while bent over
+      this.impact(fx, fy, true);
+      this.pop('명중!!', fx, fy - 18, true);
+      this.cameras.main.shake(260, 0.014);
+      sfx.heavy();
+    } else {
+      this.impact(e.x - dir * 10, e.y - 24 * K, false);
+      this.pop(Phaser.Utils.Array.GetRandom(['퍽!', '딱!']), e.x - dir * 16, e.y - 30 * K, false);
+      sfx.hit();
+    }
   }
 
   /** Knocked-down bodies fly, slide, lie, then get up (or fade out). */
@@ -339,9 +361,9 @@ export class StageScene extends Phaser.Scene {
     const p = this.player;
     if (this.stage.sword) a = swordify(a);
     for (const e of this.enemies) {
-      if (p.hitSet.has(e) || e.state === 'down' || e.state === 'dead') continue;
-      if (this.def(e).untouchable) {
-        if (hits(p, a.box, { x: e.x, y: e.y, z: e.z, hw: 10 })) this.royalWarning(e);
+      if (p.hitSet.has(e)) continue;
+      if (!hittable(e, this.def(e))) {
+        if (this.def(e).untouchable && standing(e) && hits(p, a.box, { x: e.x, y: e.y, z: e.z, hw: 10 })) this.royalWarning(e);
         continue;
       }
       if (hits(p, a.box, { x: e.x, y: e.y, z: e.z, hw: this.def(e).hw })) {
@@ -461,7 +483,7 @@ export class StageScene extends Phaser.Scene {
     for (const s of this.stones) {
       s.x += s.dir * STONE_SPEED * dt;
       for (const e of this.enemies) {
-        if (e.state === 'down' || e.state === 'dead' || this.def(e).untouchable) continue;
+        if (!hittable(e, this.def(e))) continue;
         // the stone flies at hand height; compare against the enemy's body, not its feet
         if (hits({ x: s.x, y: s.y, z: s.z - 26 * KB, facing: s.dir }, SLING_STONE.box, { x: e.x, y: e.y, z: e.z, hw: this.def(e).hw })) {
           this.applyHit(e, SLING_STONE, s.dir, false, 'stone');
@@ -488,18 +510,13 @@ export class StageScene extends Phaser.Scene {
     this.tweens.add({ targets: ring, scaleX: 28, scaleY: 18, alpha: 0, duration: 520, onComplete: () => ring.destroy() });
     this.pop('믿음의 일격!', p.x, p.y - 80, true);
     for (const e of this.enemies) {
-      if (e.state === 'dead' || this.def(e).untouchable || e.x < this.camX - 10 || e.x > this.camX + 490) continue;
+      if (!hittable(e, this.def(e), true) || e.x < this.camX - 10 || e.x > this.camX + 490) continue; // the strike also lands on enemies already down
       this.applyHit(e, { ...COMBO[2], dmg: SPECIAL_DMG }, e.x >= p.x ? 1 : -1, true);
     }
     this.hitstop = 0.2;
   }
 
   /* ---------- Ziklag: camel riders, captives (1 Sam 30) ---------- */
-  private callCamels(n: number) {
-    this.spawn(Array.from({ length: n }, (_, i) => ({ x: i % 2 ? -40 : 520, y: 210, t: 'camel' as const })));
-    this.pop('낙타 기병이다!', this.camX + 240, 90, true);
-  }
-
   /** Waits off-screen, then (warning line on David's lane) gallops across and leaves. */
   private updateCamel(e: Fighter, dt: number) {
     const p = this.player;
@@ -510,7 +527,7 @@ export class StageScene extends Phaser.Scene {
     e.state = 'walk';
     e.x += e.facing * CAMEL_SPEED * dt;
     const a = this.def(e).attack;
-    if (!e.hitSet.has(p) && p.inv <= 0 && p.state !== 'down' && p.state !== 'dead' && hits(e, a.box, { x: p.x, y: p.y, z: p.z, hw: 6 })) {
+    if (!e.hitSet.has(p) && vulnerable(p) && hits(e, a.box, { x: p.x, y: p.y, z: p.z, hw: 6 })) {
       e.hitSet.add(p); this.applyHit(p, a, e.facing);
     }
     if ((e.facing > 0 && e.x > this.camX + 540) || (e.facing < 0 && e.x < this.camX - 60)) { e.spr.destroy(); e.shadow.destroy(); e.gone = true; }
@@ -600,7 +617,7 @@ export class StageScene extends Phaser.Scene {
         const key = this.tex('guard', s.wait > 0 ? 'idle' : 'walk', s.wait > 0 ? Math.floor(T * 2.5) % 2 : Math.floor(T * 6) % 4), o = this.origins.get(key)!;
         s.spr.setTexture(key).setOrigin(o[0], o[1]).setFlipX(s.facing < 0).setPosition(Math.round(s.x), s.y);
       }
-      const sensed = run.grace <= 0 && p.state !== 'down' && p.state !== 'dead'
+      const sensed = run.grace <= 0 && standing(p)
         && (s.g.asleep ? heard(s, p, p.state === 'run') : seen(s, p));
       s.meter = suspicion(s.meter, sensed, dt, s.g.asleep ? HEAR_RATE : SIGHT_RATE);
       s.mark.setPosition(s.x, s.y - (s.g.asleep ? 34 : 70)).setText(s.meter >= 1 ? '!' : s.meter > 0 ? '?' : '').setColor(s.meter > 0.5 ? '#ff7a6a' : '#ffe27a');
@@ -668,7 +685,7 @@ export class StageScene extends Phaser.Scene {
     this.tweens.add({ targets: ring, scaleX: 26, scaleY: 16, alpha: 0, duration: 700, onComplete: () => ring.destroy() });
     this.pop('수금 연주', p.x, p.y - 82, true);
     for (const e of this.enemies) {
-      if (e.state === 'dead' || e.state === 'down' || this.def(e).untouchable || e.x < this.camX - 10 || e.x > this.camX + 490) continue;
+      if (!hittable(e, this.def(e)) || e.x < this.camX - 10 || e.x > this.camX + 490) continue;
       e.stun = HARP.stun; e.hp = Math.max(1, e.hp - HARP.dmg); e.flash = 0.07;
       if (e.ai) e.ai.mode = 'approach';
       e.state = 'idle';
@@ -692,7 +709,7 @@ export class StageScene extends Phaser.Scene {
     for (const r of this.rushers) {
       r.x += ALLY_SPEED * dt;
       for (const e of this.enemies) {
-        if (r.hitSet.has(e) || e.state === 'down' || e.state === 'dead' || this.def(e).untouchable) continue;
+        if (r.hitSet.has(e) || !hittable(e, this.def(e))) continue;
         if (hits({ x: r.x, y: r.y, z: 0, facing: 1 }, ALLY_RUSH.box, { x: e.x, y: e.y, z: e.z, hw: this.def(e).hw })) { r.hitSet.add(e); this.applyHit(e, ALLY_RUSH, 1); }
       }
       const key = this.tex(r.id, 'walk', Math.floor(T * 18) % 4), o = this.origins.get(key)!;
@@ -719,7 +736,7 @@ export class StageScene extends Phaser.Scene {
     const p = this.player;
     for (const s of this.shots) {
       s.x += s.dir * s.speed * dt;
-      const open = p.inv <= 0 && p.state !== 'down' && p.state !== 'dead';
+      const open = vulnerable(p);
       if (open && hits({ x: s.x, y: s.y, z: s.z - 26 * KB, facing: s.dir }, SHOT_BOX, { x: p.x, y: p.y, z: p.z, hw: 6 })) {
         this.applyHit(p, { ...COMBO[0], dmg: s.dmg, knock: s.knock }, s.dir);
         s.x = Infinity;
@@ -749,7 +766,7 @@ export class StageScene extends Phaser.Scene {
     e.y += Math.sign(ty - e.y) * Math.min(Math.abs(ty - e.y), d.speed * 0.7 * dt);
     e.state = step || Math.abs(ty - e.y) > 2 ? 'walk' : 'idle';
     e.x = Phaser.Math.Clamp(e.x, this.camX + 16, this.camX + 464);
-    if (ai.cd <= 0 && Math.abs(p.y - e.y) <= 10 && dist < 220 && p.state !== 'down' && p.state !== 'dead') {
+    if (ai.cd <= 0 && Math.abs(p.y - e.y) <= 10 && dist < 220 && standing(p)) {
       ai.mode = 'swing'; e.lane = e.y; this.startAttack(e, d.attack);
     }
   }
@@ -773,72 +790,22 @@ export class StageScene extends Phaser.Scene {
     e.state = 'idle';
     ai.wait -= dt;
     const inFlight = this.shots.some(s => s.spear);
-    if (ai.wait <= 0 && !inFlight && p.state !== 'down' && p.state !== 'dead') {
+    if (ai.wait <= 0 && !inFlight && standing(p)) {
       ai.mode = 'swing'; e.lane = p.y; this.startAttack(e, this.def(e).attack);
       this.say(Phaser.Utils.Array.GetRandom(['다윗을 벽에 박으리라!', '네 이놈…!', '받아라!']), e.x, e.y - 82);
     }
   }
 
   /* ---------- Goliath ---------- */
-  private hitGoliath(e: Fighter, a: Attack, dir: 1 | -1, src: 'staff' | 'stone') {
-    const g = e.g!, K = KB * 1.6;
-    const r = goliathDamage(e.hp, src, g.mode === 'stuck', dir === -e.facing, a.dmg);
-    e.hp -= r.dmg; e.flash = 0.07;
-    this.lastHit = e;
-    const fx = e.x + e.facing * 11 * K, fy = e.y - 33 * K; // forehead while bent over
-    if (r.blocked) {
-      if (src === 'stone') this.dropStone(e.x - dir * 34, e.y); // bounced off the bronze: pick it up again
-      this.hitstop = Math.max(this.hitstop, 0.03);
-      this.impact(e.x - dir * 14, e.y - 24 * K, false);
-      this.pop('팅!', e.x - dir * 20, e.y - 30 * K, false);
-      sfx.clank();
-    } else if (r.crit) {
-      this.hitstop = 0.25;
-      this.impact(fx, fy, true);
-      this.pop('명중!!', fx, fy - 18, true);
-      this.cameras.main.shake(260, 0.014);
-      sfx.heavy();
-      this.score += 1000;
-      this.faith = Math.min(FAITH_MAX, this.faith + FAITH_PER_KO);
-      if (e.hp > 0) { g.mode = 'stagger'; g.t = 0; }
-    } else {
-      this.hitstop = Math.max(this.hitstop, 0.05);
-      this.impact(e.x - dir * 10, e.y - 24 * K, false);
-      this.pop(Phaser.Utils.Array.GetRandom(['퍽!', '딱!']), e.x - dir * 16, e.y - 30 * K, false);
-      sfx.hit();
-      this.score += 50;
-      this.faith = Math.min(FAITH_MAX, this.faith + FAITH_PER_HIT);
-    }
-    if (e.hp === 1 && src !== 'stone' && !g.hinted) { g.hinted = true; this.say('마지막은 물매로!', this.player.x, this.player.y - 70); }
-    if (!g.phase2 && e.hp > 0 && e.hp <= 50) {
-      g.phase2 = true;
-      sfx.roar();
-      this.cameras.main.shake(400, 0.01);
-      this.pop('크아아!!', e.x, e.y - 50 * K, true);
-      this.spawn([{ x: -40, y: 196 }, { x: 520, y: 236, t: 'philB' }]);
-    }
-    if (e.hp <= 0) {
-      // the stone sank into his forehead and he fell on his face (1 Sam 17:49)
-      e.state = 'down'; e.t = 0; e.vx = -e.facing * 40; e.vz = 110; e.z = 1;
-      this.hitstop = 0.6;
-      this.cameras.main.flash(300, 255, 255, 255);
-      this.cameras.main.shake(600, 0.02);
-      this.pop('골리앗이 쓰러졌다!', e.x, e.y - 70 * K, true);
-      this.score += 10000;
-      for (const o of this.enemies) if (o !== e && o.state !== 'dead') o.flee = true;
-      this.bubble?.destroy(); this.bubble = null;
-    }
-  }
-
   private updateGoliath(e: Fighter, dt: number) {
     const g = e.g!, p = this.player, K = KB * 1.6;
     if (e.state === 'down' || e.state === 'dead') { this.physicsDown(e, dt); if (e.state === 'dead') e.gone = true; return; }
     g.t += dt; g.cd = Math.max(0, g.cd - dt);
     const go = (m: GMode) => { g.mode = m; g.t = 0; };
     const dx = p.x - e.x, adx = Math.abs(dx), dy = p.y - e.y;
-    const open = p.state !== 'down' && p.state !== 'dead';
+    const open = standing(p);
     const strike = (a: Attack) => {
-      if (e.t >= a.active[0] && e.t <= a.active[1] && !e.hitSet.has(p) && p.inv <= 0 && open && hits(e, a.box, { x: p.x, y: p.y, z: p.z, hw: 6 })) {
+      if (e.t >= a.active[0] && e.t <= a.active[1] && !e.hitSet.has(p) && vulnerable(p) && hits(e, a.box, { x: p.x, y: p.y, z: p.z, hw: 6 })) {
         e.hitSet.add(p); this.applyHit(p, a, e.facing);
       }
     };
@@ -897,7 +864,7 @@ export class StageScene extends Phaser.Scene {
     if (!q) return;
     q.t += dt;
     const r = q.t * 420;
-    if (!q.hit && p.z < 4 && p.inv <= 0 && Math.abs(p.y - q.y) <= 40 && Math.abs(Math.abs(p.x - q.x) - r) < 14 && p.state !== 'down' && p.state !== 'dead') {
+    if (!q.hit && p.z < 4 && vulnerable(p) && Math.abs(p.y - q.y) <= 40 && Math.abs(Math.abs(p.x - q.x) - r) < 14) {
       q.hit = true;
       this.applyHit(p, { ...GOLIATH_SWEEP, dmg: GOLIATH_SLAM_DMG }, p.x >= q.x ? 1 : -1);
     }
@@ -926,7 +893,7 @@ export class StageScene extends Phaser.Scene {
         for (let i = 0; i < 3; i++) { const a = T * 5 + i * 2.1; this.topfx.fillStyle(0xffe27a, 1).fillRect(Math.round(e.x + Math.cos(a) * 9) - 1, Math.round(hy + Math.sin(a) * 2.5), 3, 1).fillRect(Math.round(e.x + Math.cos(a) * 9), Math.round(hy + Math.sin(a) * 2.5) - 1, 1, 3); }
       }
     }
-    const e = this.enemies.find(o => o.g && o.state !== 'down' && o.state !== 'dead'), K = KB * 1.6;
+    const e = this.enemies.find(o => o.g && standing(o)), K = KB * 1.6;
     if (e?.g?.mode === 'tele' && Math.floor(T * 12) % 2) {
       const x0 = e.x + e.facing * 24, x1 = e.x + e.facing * 140, y = e.g.lane;
       this.fxg.fillStyle(0xe63c3c, 0.45).fillRect(Math.min(x0, x1), y - 6, Math.abs(x1 - x0), 12);
@@ -948,13 +915,6 @@ export class StageScene extends Phaser.Scene {
   }
 
   /* ---------- sheep ---------- */
-  private dropSheep(thief: Fighter) {
-    const s = thief.carry!;
-    s.carrier = null; thief.carry = undefined; thief.fights = true;
-    this.say('음매~', s.x, s.y - 34);
-    sfx.baa();
-  }
-
   private updateFlock(dt: number, T: number) {
     const p = this.player;
     for (const s of this.flock) {
@@ -987,7 +947,7 @@ export class StageScene extends Phaser.Scene {
     const p = this.player, ai = e.ai!, d = this.def(e);
     ai.cd = Math.max(0, ai.cd - dt);
     if (d.ai === 'saul') { this.updateSaul(e, dt); return; }
-    if (e.flee && e.state !== 'down' && e.state !== 'dead') {
+    if (e.flee && standing(e)) {
       // their champion is dead: run (1 Sam 17:51)
       const dir = e.x < this.camX + 240 ? -1 : 1;
       e.facing = dir; e.state = 'walk'; e.x += dir * 160 * dt;
@@ -1007,7 +967,7 @@ export class StageScene extends Phaser.Scene {
     if (this.prog.locked && Math.abs(p.x + ai.side * d.reach - (this.camX + 240)) > 224) ai.side = (ai.side * -1) as 1 | -1;
     const tx = p.x + ai.side * d.reach, ty = Phaser.Math.Clamp(p.y + ai.lane, FLOOR_TOP, FLOOR_BOTTOM);
     const faceP = () => { e.facing = p.x >= e.x ? 1 : -1; };
-    const playerOpen = p.state !== 'down' && p.state !== 'dead';
+    const playerOpen = standing(p);
     // bosses: a charge / pounce from range when lined up
     const sp = d.special, dist = Math.abs(p.x - e.x);
     if (sp && ai.cd <= 0 && ai.mode !== 'swing' && playerOpen && dist >= sp.from && dist <= sp.to && Math.abs(p.y - e.y) <= DEPTH_TOL) {
@@ -1043,7 +1003,7 @@ export class StageScene extends Phaser.Scene {
           e.z += e.vz * dt; e.vz -= GRAV * dt;
           if (e.z <= 0) { e.z = 0; e.vz = 0; e.vx = 0; this.cameras.main.shake(90, 0.006); }
         }
-        if (e.t >= a.active[0] && e.t <= a.active[1] && !e.hitSet.has(p) && p.inv <= 0 && playerOpen
+        if (e.t >= a.active[0] && e.t <= a.active[1] && !e.hitSet.has(p) && vulnerable(p)
           && hits(e, a.box, { x: p.x, y: p.y, z: p.z, hw: 6 })) { e.hitSet.add(p); this.applyHit(p, a, e.facing); }
         if (e.t >= a.dur && e.z <= 0) {
           const stillClose = dist < d.reach + 14 && Math.abs(p.y - e.y) <= DEPTH_TOL && playerOpen;

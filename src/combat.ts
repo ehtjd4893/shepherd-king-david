@@ -75,6 +75,8 @@ export interface EnemyDef {
   untouchable?: boolean;
   /** extra move used from a distance (bear charge, lion pounce) */
   special?: { attack: Attack; from: number; to: number; every: number };
+  /** calls for help each time his health drops past a CHIEF_CALLS mark: camel riders / guards */
+  calls?: 'camels' | 'guards';
 }
 export const ENEMIES = {
   philA: { name: '블레셋 보병', hp: 40, speed: 95, reach: 34, hw: 6, attack: SOLDIER_SLASH, ai: 'soldier' },
@@ -88,10 +90,10 @@ export const ENEMIES = {
   captain: { name: '블레셋 대장', hp: 160, speed: 85, reach: 38, hw: 8, attack: SOLDIER_SLASH, ai: 'soldier', boss: true, scale: 1.3, special: { attack: SHIELD_CHARGE, from: 90, to: 240, every: 3 } },
   amalek: { name: '아말렉 병사', hp: 34, speed: 100, reach: 36, hw: 6, attack: SCIMITAR, ai: 'soldier' },
   camel: { name: '낙타 기병', hp: 20, speed: 0, reach: 0, hw: 14, attack: CAMEL_CHARGE, ai: 'camel' },
-  chief: { name: '아말렉 대장', hp: 180, speed: 95, reach: 40, hw: 9, attack: CHIEF_SWEEP, ai: 'soldier', boss: true, scale: 1.35, special: { attack: CHIEF_CHARGE, from: 90, to: 240, every: 3.2 } },
+  chief: { name: '아말렉 대장', hp: 180, speed: 95, reach: 40, hw: 9, attack: CHIEF_SWEEP, ai: 'soldier', boss: true, scale: 1.35, special: { attack: CHIEF_CHARGE, from: 90, to: 240, every: 3.2 }, calls: 'camels' },
   jebusite: { name: '여부스 병사', hp: 36, speed: 90, reach: 60, hw: 6, attack: SOLDIER_THRUST, ai: 'soldier' },
   jebArcher: { name: '여부스 궁수', hp: 26, speed: 80, reach: 150, hw: 6, attack: ARROW_SHOT, ai: 'archer' },
-  lord: { name: '여부스 성주', hp: 200, speed: 80, reach: 56, hw: 9, attack: LORD_THRUST, ai: 'soldier', boss: true, scale: 1.4, special: { attack: LORD_CHARGE, from: 100, to: 260, every: 3 } },
+  lord: { name: '여부스 성주', hp: 200, speed: 80, reach: 56, hw: 9, attack: LORD_THRUST, ai: 'soldier', boss: true, scale: 1.4, special: { attack: LORD_CHARGE, from: 100, to: 260, every: 3 }, calls: 'guards' },
   philC: { name: '방패병', hp: 44, speed: 70, reach: 34, hw: 6, attack: SOLDIER_SLASH, ai: 'soldier' },
   goliath: { name: '골리앗', hp: 100, speed: 34, reach: 90, hw: 22, attack: SOLDIER_THRUST, ai: 'goliath', boss: true, scale: 1.6 },
   lion: { name: '사자', hp: 200, speed: 120, reach: 42, hw: 15, attack: LION_CLAW, ai: 'soldier', boss: true, special: { attack: LION_POUNCE, from: 80, to: 180, every: 2.4 } },
