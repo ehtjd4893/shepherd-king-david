@@ -150,7 +150,7 @@ export const STAGES: Record<string, StageDef> = {
     sections: [
       { at: 0, waves: [[{ x: 520, y: 200, t: 'raider' }, { x: 540, y: 232, t: 'raider' }, { x: -40, y: 214, t: 'jackal' }]] },
       {
-        at: 560, waves: [[]],
+        at: 560, waves: [],
         stealth: {
           mood: 'cave', saul: { x: 440, y: 200 },
           guards: [{ x: 300, y: 196, from: 220, to: 380 }, { x: 360, y: 232, from: 260, to: 420 }],
@@ -159,7 +159,7 @@ export const STAGES: Record<string, StageDef> = {
       },
       { at: 1100, waves: [[{ x: 520, y: 196, t: 'raider' }, { x: 540, y: 226, t: 'raider' }, { x: -40, y: 210, t: 'raider' }, { x: -60, y: 238, t: 'jackal' }, { x: 560, y: 186, t: 'jackal' }]] },
       {
-        at: 1440, waves: [[]],
+        at: 1440, waves: [],
         stealth: {
           mood: 'night', saul: { x: 360, y: 214 },
           guards: [{ x: 210, y: 196, asleep: true }, { x: 290, y: 238, asleep: true }, { x: 430, y: 204, asleep: true }, { x: 300, y: 184, asleep: true }],

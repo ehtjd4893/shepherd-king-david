@@ -1,4 +1,4 @@
-// Pure combat + stage-progress rules. No Phaser here, so node --test can run it directly.
+// Pure combat rules and stage data types. No Phaser here, so node --test can run it directly.
 
 export const DEPTH_TOL = 12; // px of floor depth (y) within which two fighters share a lane
 
@@ -120,24 +120,8 @@ export interface Goal { x: number; y: number; kind: 'robe' | 'spear' | 'jug' }
 export interface Stealth { mood: 'cave' | 'night'; saul: { x: number; y: number }; guards: Guard[]; goals: Goal[] }
 /** Captives to untie (1 Sam 30:18-19); the section ends only when everyone is freed. */
 export interface Captive { x: number; y: number; who: 'villager' | 'child' }
+/** A stretch of the stage that locks the screen until its waves are beaten (and its stealth goals taken / captives freed). A stealth section has no waves. */
 export interface Section { at: number; waves: Spawn[][]; stealth?: Stealth; captives?: Captive[] }
-export interface Prog { section: number; wave: number; locked: boolean; done: boolean }
-
-export const LOCK_AT = 200; // player reaching section.at + LOCK_AT locks the screen
-
-/** Advance stage progress. Returns the wave to spawn, if any. Waves move on only when nobody is left alive. */
-export function stepProg(p: Prog, sections: Section[], playerX: number, alive: number): { p: Prog; spawn: Spawn[] | null } {
-  if (p.done) return { p, spawn: null };
-  const s = sections[p.section];
-  if (!p.locked) {
-    if (playerX < s.at + LOCK_AT) return { p, spawn: null };
-    return { p: { ...p, locked: true, wave: 0 }, spawn: s.waves[0] };
-  }
-  if (alive > 0) return { p, spawn: null };
-  if (p.wave + 1 < s.waves.length) return { p: { ...p, wave: p.wave + 1 }, spawn: s.waves[p.wave + 1] };
-  const next = p.section + 1;
-  return { p: { section: next, wave: 0, locked: false, done: next >= sections.length }, spawn: null };
-}
 
 // ---------- Goliath (1 Sam 17) ----------
 export const GOLIATH_CRIT = 25;

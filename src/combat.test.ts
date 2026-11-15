@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hits, stepProg, rockHits, slideDown, SHAFT, camelPhase, chiefCalls, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, HEAR_RANGE, HEAR_RATE, swordify, COMBO, SWORD_REACH, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP, type Prog, type Section } from './combat.ts';
+import { hits, rockHits, slideDown, SHAFT, camelPhase, chiefCalls, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, HEAR_RANGE, HEAR_RATE, swordify, COMBO, SWORD_REACH, archerStep, SHOT_BOX, isDoubleTap, spinCost, reaction, goliathDamage, brookShouldDrop, GOLIATH_CRIT, BROOK_EMPTY_DELAY, BROOK_LOW_EVERY, DEPTH_TOL, DOUBLE_TAP, SPIN_FAITH, SPIN_HP } from './combat.ts';
 
 test('spin spends faith first, then a little health, never the last of it', () => {
   assert.deepEqual(spinCost(SPIN_FAITH, 50), { faith: 0, hp: 50 });
@@ -34,35 +34,6 @@ test('behind the attacker misses; facing flips the box', () => {
 
 test('jumping target clears a low swing', () => {
   assert.equal(hits(david, box, { x: 130, y: 200, z: 31, hw: 6 }), false);
-});
-
-const sections: Section[] = [
-  { at: 0, waves: [[{ x: 500, y: 200 }], [{ x: 500, y: 210 }]] },
-  { at: 600, waves: [[{ x: 500, y: 200 }]] },
-];
-const start: Prog = { section: 0, wave: 0, locked: false, done: false };
-
-test('screen locks when the player walks in, spawning wave 1', () => {
-  assert.equal(stepProg(start, sections, 150, 0).spawn, null);
-  const r = stepProg(start, sections, 200, 0);
-  assert.equal(r.p.locked, true);
-  assert.deepEqual(r.spawn, sections[0].waves[0]);
-});
-
-test('next wave only after everyone is down', () => {
-  const locked: Prog = { ...start, locked: true };
-  assert.equal(stepProg(locked, sections, 300, 1).spawn, null);
-  assert.equal(stepProg(locked, sections, 300, 1).p.wave, 0);
-  const r = stepProg(locked, sections, 300, 0);
-  assert.equal(r.p.wave, 1);
-  assert.deepEqual(r.spawn, sections[0].waves[1]);
-});
-
-test('last wave cleared unlocks and moves to next section, then done', () => {
-  const r = stepProg({ ...start, locked: true, wave: 1 }, sections, 300, 0);
-  assert.deepEqual(r.p, { section: 1, wave: 0, locked: false, done: false });
-  const end = stepProg({ section: 1, wave: 0, locked: true, done: false }, sections, 900, 0);
-  assert.equal(end.p.done, true);
 });
 
 test('bosses shrug off light hits, stagger on heavy ones, fall only when beaten', () => {

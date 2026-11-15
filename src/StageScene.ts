@@ -4,10 +4,11 @@ import {
   bgElah, bgField, bgGibeah, bgWild, bgKeilah, bgZiklag, bgJebus, bgZion, KB, frame, bar, R, D, C,
 } from './art.ts';
 import {
-  hits, stepProg, spinCost, brookShouldDrop, archerStep, swordify, camelPhase, CAMEL_SPEED, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, SIGHT_RATE, HEAR_RATE, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
-  SPECIAL_DMG, FAITH_MAX, STONE_MAX, type Attack, type Prog, type Spawn, type EnemyId, type EnemyDef, type Section, type Guard, type Goal, type Captive,
+  hits, spinCost, brookShouldDrop, archerStep, swordify, camelPhase, CAMEL_SPEED, CAMEL_WARN, seen, heard, suspicion, SIGHT_RANGE, SIGHT_RATE, HEAR_RATE, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
+  SPECIAL_DMG, FAITH_MAX, STONE_MAX, type Attack, type Spawn, type EnemyId, type EnemyDef, type Section, type Guard, type Goal, type Captive,
 } from './combat.ts';
 import { resolveHit, standing, vulnerable, hittable, type HitOutcome } from './hit.ts';
+import { advance, startAt, cameraTarget, betweenFights, verdict, type Prog } from './progress.ts';
 import { Controls } from './controls.ts';
 import { STAGES, type StageDef } from './stages.ts';
 import { sfx } from './sfx.ts';
@@ -105,11 +106,9 @@ export class StageScene extends Phaser.Scene {
     this.ammo = this.stage.ammo ?? STONE_MAX; this.kos = 0; this.sheepLost = 0; this.hintsShown = 0;
     this.quake = null; this.bubble = null; this.brookT = 0; this.shots = []; this.saulDodged = 0; this.royalWarnAt = -9; this.rushers = []; this.allyCd = 0; this.stealthRun = null; this.bound = [];
     this.spinRing = null;
-    this.prog = { section: this.startSection, wave: 0, locked: false, done: false };
-    this.camX = this.hitstop = this.time0 = this.atkBuf = this.slingCd = 0;
-    const retryAt = this.startSection ? this.stage.sections[this.startSection].at : 0;
-    this.camX = retryAt;
-    this.hintsShown = this.stage.hints.filter(h => h.at < retryAt).length;
+    this.hitstop = this.time0 = this.atkBuf = this.slingCd = 0;
+    const start = startAt(this.stage, this.startSection);
+    this.prog = start.prog; this.camX = start.camX; this.hintsShown = start.hintsShown;
     this.score = (this.registry.get('score') as number) ?? 0;
     writeSave({ stage: this.stageId, score: this.score }); // continue from here next time
     this.faith = 40;
@@ -134,7 +133,7 @@ export class StageScene extends Phaser.Scene {
     this.fxg = this.add.graphics().setDepth(2);
     this.shade = this.add.rectangle(0, 0, 480, 270, 0x0a0c30, 0).setOrigin(0).setScrollFactor(0).setDepth(1500);
     this.topfx = this.add.graphics().setDepth(940);
-    const startX = this.startSection ? retryAt + 60 : this.stage.start ?? 60;
+    const startX = start.playerX;
     this.player = this.makeFighter(this.stage.sword ? 'davidS' : 'david', '다윗', startX, 210, 100);
     for (let i = 0; i < this.stage.sheep; i++) {
       const x = startX - 30 - (i % 3) * 18, y = 186 + ((i * 13) % 50);
@@ -1194,20 +1193,22 @@ export class StageScene extends Phaser.Scene {
 
       this.updateStealth(dt, T);
       this.updateCaptives(T);
-      const goalsLeft = (this.stealthRun ? this.stealthRun.goals.filter(g => !g.done).length : 0) + this.bound.filter(b => !b.done).length;
-      const r = stepProg(this.prog, this.stage.sections, this.player.x, this.enemies.length + goalsLeft);
+      const r = advance(this.prog, this.stage.sections, this.player.x, {
+        enemies: this.enemies.length,
+        stealthGoals: this.stealthRun ? this.stealthRun.goals.filter(g => !g.done).length : 0,
+        captives: this.bound.filter(b => !b.done).length,
+      });
       this.prog = r.p;
-      if (r.spawn) {
-        this.spawn(r.spawn);
-        const sec = this.stage.sections[this.prog.section];
-        if (sec.stealth && this.prog.wave === 0) this.setupStealth(sec);
-        if (sec.captives && this.prog.wave === 0) this.setupCaptives(sec);
+      for (const ev of r.events) {
+        if (ev.type === 'wave') this.spawn(ev.spawns);
+        else if (ev.type === 'stealth') this.setupStealth(ev.section);
+        else if (ev.type === 'captives') this.setupCaptives(ev.section);
       }
     }
     this.updateFlock(dt, T);
 
     // camera: only moves forward; locks onto the section while a fight is on
-    const target = this.prog.locked ? this.stage.sections[this.prog.section].at : Math.max(this.camX, this.player.x - 200);
+    const target = cameraTarget(this.prog, this.stage.sections, this.camX, this.player.x);
     this.camX = Phaser.Math.Clamp(this.camX + (target - this.camX) * Math.min(1, dt * 8), 0, this.stage.width - 480);
     this.cameras.main.scrollX = Math.round(this.camX);
 
@@ -1216,10 +1217,10 @@ export class StageScene extends Phaser.Scene {
     this.drawHud(T);
     this.drawGoliathFx(T);
 
-    const cleared = !this.prog.locked && !this.prog.done && this.prog.section > 0;
-    this.texts.go.setVisible(cleared && Math.floor(T * 3) % 2 === 0);
-    if (!this.ended && (this.prog.done || this.player.state === 'dead')) {
-      this.ended = this.prog.done ? 'clear' : 'dead';
+    this.texts.go.setVisible(betweenFights(this.prog) && Math.floor(T * 3) % 2 === 0);
+    const end = verdict(this.prog, this.player.state === 'dead');
+    if (!this.ended && end) {
+      this.ended = end;
       this.endAt = T;
       this.tweens.killTweensOf(this.texts.banner);
       if (this.ended === 'clear') {
