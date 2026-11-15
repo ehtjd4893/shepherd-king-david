@@ -4,20 +4,19 @@ import {
   bgElah, bgField, bgGibeah, bgWild, bgKeilah, bgZiklag, bgJebus, bgZion, KB, frame, bar, R, D, C,
 } from './art.ts';
 import {
-  hits, spinCost, brookShouldDrop, archerStep, swordify, camelPhase, CAMEL_SPEED, CAMEL_WARN, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_THRUST, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, DEPTH_TOL,
-  SPECIAL_DMG, FAITH_MAX, STONE_MAX, type Attack, type Spawn, type EnemyId, type EnemyDef, type Section, type Captive,
+  hits, spinCost, brookShouldDrop, swordify, ALLY_COOLDOWN, ALLY_SPEED, ALLY_RUSH, ARROW_SPEED, SPEAR_SPEED, SAUL_DODGES, SHOT_BOX, HARP, GOLIATH_SWEEP, GOLIATH_SLAM_DMG, COMBO, DASH_ATTACK, JUMP_ATTACK, SLING_STONE, SPIN, ENEMIES, FLOOR_TOP, FLOOR_BOTTOM, GRAV,
+  SPECIAL_DMG, FAITH_MAX, STONE_MAX, type Attack, type Spawn, type EnemyDef, type Section, type Captive,
 } from './combat.ts';
 import { resolveHit, standing, vulnerable, hittable, type HitOutcome } from './hit.ts';
 import { advance, startAt, cameraTarget, betweenFights, verdict, type Prog } from './progress.ts';
 import { startStealth, stepStealth, entry, SIGHT_RANGE, type StealthRun, type StealthEvent } from './stealth.ts';
+import { think, arrive, telegraphs, startAttack, physicsDown, slide, type Actor, type SheepBody, type GMode, type World, type Intent } from './fighters.ts';
 import { Controls } from './controls.ts';
 import { STAGES, type StageDef } from './stages.ts';
 import { sfx } from './sfx.ts';
 import { writeSave } from './save.ts';
 
-const FLOOR_TOP = 168, FLOOR_BOTTOM = 246, GRAV = 760;
 const WALK_X = 125, WALK_Y = 80, RUN_X = 220, JUMP_V = 240;
-const MAX_ATTACKERS = 3, CHAIN_CHANCE = 0.4; // enemies swinging at once; chance to follow a swing with another
 const SLING_COOLDOWN = 0.8, STONE_SPEED = 460;
 const FONT = '"Do Hyeon", "Apple SD Gothic Neo", sans-serif';
 // the sling throw: [pose, frame, seconds]; the stone leaves at the start of 'release'
@@ -26,31 +25,19 @@ const SLING_RELEASE = 0.15, SLING_DUR = 0.31, SPECIAL_DUR = 0.55;
 const DROP_EVERY = 2, PICKUP_LIFE = 9; // every 2nd knockout drops a stone; it lies there 9 s
 const SHEEP_BONUS = 1000;
 
-type State = 'idle' | 'walk' | 'run' | 'jump' | 'attack' | 'sling' | 'spin' | 'special' | 'harp' | 'hurt' | 'down' | 'getup' | 'dead';
-interface Fighter {
-  id: string; name: string; kind?: EnemyId;
-  x: number; y: number; z: number; vx: number; vz: number; facing: 1 | -1;
-  hp: number; maxHp: number; state: State; t: number; inv: number; flash: number;
-  atk?: Attack; combo: number; queued: boolean; hitSet: Set<Fighter>; airAtk: boolean;
-  ai?: { mode: 'approach' | 'ready' | 'swing' | 'back'; wait: number; side: 1 | -1; lane: number; cd: number };
-  carry?: Sheep; fights?: boolean; // sheep thief: carrying a sheep / gave up stealing
-  g?: GState; flee?: boolean; gone?: boolean; stun?: number; lane?: number;
-  spr: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image;
-}
-type GMode = 'taunt' | 'walk' | 'tele' | 'thrust' | 'stuck' | 'sweepA' | 'sweep' | 'jumpA' | 'jump' | 'recover' | 'stagger';
-/** Goliath's own state machine: he's slow, telegraphs everything, and is only open right after an attack. */
-interface GState { mode: GMode; t: number; cd: number; lane: number; stuckFor: number; jumpVx: number; phase2: boolean; hinted: boolean }
+/** David or an enemy, plus what draws it. */
+interface Fighter extends Actor { spr: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }
 interface Stone { x: number; y: number; z: number; dir: 1 | -1; img: Phaser.GameObjects.Image }
 /** Enemy projectile: an archer's arrow or Saul's spear. */
 interface Shot { x: number; y: number; z: number; dir: 1 | -1; speed: number; dmg: number; knock: boolean; spear: boolean; passed: boolean; img: Phaser.GameObjects.Image }
 /** Adullam companion charging across the screen. */
-interface Rusher { id: string; x: number; y: number; hitSet: Set<Fighter>; spr: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }
+interface Rusher { id: string; x: number; y: number; hitSet: Set<Actor>; spr: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }
 /** What the scene draws for a stealth section (the state itself is a StealthRun): a sprite and a ?/! mark per guard, the marks over each goal. */
 interface StealthView { sentries: { spr: Phaser.GameObjects.Image; mark: Phaser.GameObjects.Text }[]; goals: Phaser.GameObjects.GameObject[][] }
 /** A captive in the Amalekite camp, freed by walking up and pressing attack. */
 interface Bound { c: Captive; x: number; done: boolean; img: Phaser.GameObjects.Image; rope: Phaser.GameObjects.Graphics; arrow: Phaser.GameObjects.Text }
 interface Pickup { x: number; y: number; t: number; img: Phaser.GameObjects.Image; arrow: Phaser.GameObjects.Text }
-interface Sheep { i: number; x: number; y: number; facing: 1 | -1; moving: boolean; carrier: Fighter | null; img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }
+interface Sheep extends SheepBody { img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }
 
 export class StageScene extends Phaser.Scene {
   private stageId = 'field';
@@ -175,21 +162,15 @@ export class StageScene extends Phaser.Scene {
       const kind = s.t ?? 'philA', d: EnemyDef = ENEMIES[kind];
       const e = this.makeFighter(kind, d.name, this.camX + s.x, s.y, d.hp);
       e.kind = kind;
-      if (kind === 'goliath') {
-        e.g = { mode: 'taunt', t: 0, cd: 0, lane: s.y, stuckFor: 1.3, jumpVx: 0, phase2: false, hinted: false };
+      arrive(e, s, list, this.camX, this.enemies, () => Math.random());
+      if (e.g) {
         e.shadow.setScale(2.6, 1.6);
         // speech bubble at his mouth, clear of the tip line above
         this.bubble = this.add.text(this.camX + s.x - 34, s.y - 84, '와 봐라, 꼬마야! 네 살을 새들에게 주겠다!', {
           fontFamily: FONT, fontSize: '10px', color: '#1c1226', backgroundColor: '#ffffff', padding: { x: 5, y: 3 },
         }).setOrigin(1, 1).setDepth(960);
       }
-      e.facing = s.x < 240 ? 1 : -1;
       if (isBeast(kind)) e.shadow.setScale(d.hw / 8, 1.2);
-      // surround: take whichever side of David has fewer enemies
-      const left = this.enemies.filter(o => o.ai?.side === -1).length, right = this.enemies.length - left;
-      e.ai = { mode: 'approach', wait: 0, side: left < right ? -1 : left > right ? 1 : (s.x < 240 ? -1 : 1), lane: Phaser.Math.Between(-5, 5), cd: 1.5 };
-      if (kind === 'saul') { e.ai.wait = 2.2; e.ai.mode = 'ready'; } // a beat to read the tip before the first spear
-      if (kind === 'camel') { e.x = s.x < 240 ? this.camX - 50 : this.camX + 530; e.t = -0.8 * list.slice(0, list.indexOf(s)).filter(o => o.t === 'camel').length; }
       this.enemies.push(e);
       if (d.boss) {
         this.cameras.main.shake(500, 0.01);
@@ -270,10 +251,9 @@ export class StageScene extends Phaser.Scene {
   }
 
   /* ---------- combat ---------- */
-  private startAttack(f: Fighter, a: Attack) {
-    f.state = 'attack'; f.t = 0; f.atk = a; f.queued = false; f.hitSet.clear();
-    f.vx = f.facing * a.lunge;
-    if (f === this.player) sfx.swing();
+  private playerAttack(a: Attack) {
+    startAttack(this.player, a);
+    sfx.swing();
   }
 
   /** The rules live in resolveHit (hit.ts); this plays what it says happened. */
@@ -339,25 +319,6 @@ export class StageScene extends Phaser.Scene {
     }
   }
 
-  /** Knocked-down bodies fly, slide, lie, then get up (or fade out). */
-  private physicsDown(f: Fighter, dt: number) {
-    if (f.z > 0 || f.vz > 0) {
-      f.z += f.vz * dt; f.vz -= GRAV * dt; f.x += f.vx * dt;
-      if (f.z <= 0) { f.z = 0; f.vz = 0; f.vx *= 0.3; f.t = 0; }
-      return;
-    }
-    f.x += f.vx * dt; f.vx *= Math.pow(0.002, dt);
-    if (f.state === 'down' && f.t > 0.5) {
-      if (f.hp <= 0) { f.state = 'dead'; f.t = 0; }
-      else { f.state = 'getup'; f.t = 0; }
-    }
-  }
-
-  private slide(f: Fighter, dt: number) {
-    f.x += f.vx * dt;
-    f.vx *= Math.pow(0.0005, dt);
-  }
-
   private hitEnemies(a: Attack, dirFrom?: number) {
     const p = this.player;
     if (this.stage.sword) a = swordify(a);
@@ -400,8 +361,8 @@ export class StageScene extends Phaser.Scene {
         p.state = running ? 'run' : c.x || c.y ? 'walk' : 'idle';
         if (attack) {
           this.atkBuf = 0;
-          if (running) this.startAttack(p, DASH_ATTACK);
-          else { p.combo = 0; this.startAttack(p, COMBO[0]); }
+          if (running) this.playerAttack(DASH_ATTACK);
+          else { p.combo = 0; this.playerAttack(COMBO[0]); }
         } else if (c.jump) {
           p.vx = running ? c.x * RUN_X : c.x * WALK_X;
           p.state = 'jump'; p.vz = JUMP_V; p.z = 0.01; p.airAtk = false; p.hitSet.clear(); sfx.jump();
@@ -422,11 +383,11 @@ export class StageScene extends Phaser.Scene {
         break;
       case 'attack': {
         const a = p.atk!;
-        this.slide(p, dt);
+        slide(p, dt);
         if (attack && p.t > a.dur * 0.25) { this.atkBuf = 0; p.queued = true; }
         if (p.t >= a.active[0] && p.t <= a.active[1]) this.hitEnemies(a);
         if (p.t >= a.dur) {
-          if (p.queued && a !== DASH_ATTACK && p.combo < COMBO.length - 1) this.startAttack(p, COMBO[++p.combo]);
+          if (p.queued && a !== DASH_ATTACK && p.combo < COMBO.length - 1) this.playerAttack(COMBO[++p.combo]);
           else { p.state = 'idle'; p.combo = 0; }
         }
         break;
@@ -452,8 +413,8 @@ export class StageScene extends Phaser.Scene {
         if (p.t >= SPIN.dur) { p.state = 'idle'; this.spinRing?.destroy(); this.spinRing = null; }
         break;
       }
-      case 'hurt': this.slide(p, dt); if (p.t > 0.25) p.state = 'idle'; break;
-      case 'down': case 'dead': this.physicsDown(p, dt); break;
+      case 'hurt': slide(p, dt); if (p.t > 0.25) p.state = 'idle'; break;
+      case 'down': case 'dead': physicsDown(p, dt); break;
       case 'getup': if (p.t > 0.25) { p.state = 'idle'; p.inv = 1.0; } break;
     }
     p.y = Phaser.Math.Clamp(p.y, FLOOR_TOP, FLOOR_BOTTOM);
@@ -517,23 +478,7 @@ export class StageScene extends Phaser.Scene {
     this.hitstop = 0.2;
   }
 
-  /* ---------- Ziklag: camel riders, captives (1 Sam 30) ---------- */
-  /** Waits off-screen, then (warning line on David's lane) gallops across and leaves. */
-  private updateCamel(e: Fighter, dt: number) {
-    const p = this.player;
-    if (e.t < 0) return;
-    if (e.lane === undefined) e.lane = p.y;
-    e.y = e.lane;
-    if (camelPhase(e.t) === 'warn') { e.state = 'idle'; return; }
-    e.state = 'walk';
-    e.x += e.facing * CAMEL_SPEED * dt;
-    const a = this.def(e).attack;
-    if (!e.hitSet.has(p) && vulnerable(p) && hits(e, a.box, { x: p.x, y: p.y, z: p.z, hw: 6 })) {
-      e.hitSet.add(p); this.applyHit(p, a, e.facing);
-    }
-    if ((e.facing > 0 && e.x > this.camX + 540) || (e.facing < 0 && e.x < this.camX - 60)) { e.spr.destroy(); e.shadow.destroy(); e.gone = true; }
-  }
-
+  /* ---------- Ziklag: captives (1 Sam 30) ---------- */
   private setupCaptives(sec: Section) {
     this.bound = sec.captives!.map(c => {
       const x = sec.at + c.x, key = this.tex(c.who, 'tied', 0), o = this.origins.get(key)!;
@@ -736,113 +681,6 @@ export class StageScene extends Phaser.Scene {
     this.shots = this.shots.filter(s => s.img.active);
   }
 
-  /** Archer: keep ~110-170px away on David's lane, draw (warning line), loose, reposition. */
-  private updateArcher(e: Fighter, dt: number) {
-    const p = this.player, ai = e.ai!, d = this.def(e), dist = Math.abs(p.x - e.x), toward = Math.sign(p.x - e.x) || 1;
-    e.facing = toward as 1 | -1;
-    if (ai.mode === 'swing') {
-      const a = e.atk!;
-      if (e.t >= a.active[0] && e.t - dt < a.active[0]) this.fire(e, false, e.lane ?? e.y);
-      if (e.t >= a.dur) { ai.mode = 'approach'; ai.cd = Phaser.Math.FloatBetween(1.2, 2.2); e.state = 'idle'; }
-      return;
-    }
-    const step = archerStep(dist), ty = Phaser.Math.Clamp(p.y + ai.lane, FLOOR_TOP, FLOOR_BOTTOM);
-    e.x += step * toward * d.speed * dt;
-    e.y += Math.sign(ty - e.y) * Math.min(Math.abs(ty - e.y), d.speed * 0.7 * dt);
-    e.state = step || Math.abs(ty - e.y) > 2 ? 'walk' : 'idle';
-    e.x = Phaser.Math.Clamp(e.x, this.camX + 16, this.camX + 464);
-    if (ai.cd <= 0 && Math.abs(p.y - e.y) <= 10 && dist < 220 && standing(p)) {
-      ai.mode = 'swing'; e.lane = e.y; this.startAttack(e, d.attack);
-    }
-  }
-
-  /** King Saul: can't be fought. He raises the spear over David's lane and hurls it — dodge it three times (1 Sam 18:11, 19:10). */
-  private updateSaul(e: Fighter, dt: number) {
-    const p = this.player, ai = e.ai!;
-    e.facing = p.x >= e.x ? 1 : -1;
-    if (this.saulDodged >= SAUL_DODGES) {
-      // he storms off; the court is open
-      e.state = 'walk'; e.facing = 1; e.x += 70 * dt;
-      if (e.x > this.camX + 520) { e.spr.destroy(); e.shadow.destroy(); e.gone = true; }
-      return;
-    }
-    if (ai.mode === 'swing') {
-      const a = e.atk!;
-      if (e.t >= a.active[0] && e.t - dt < a.active[0]) this.fire(e, true, e.lane ?? p.y);
-      if (e.t >= a.dur) { ai.mode = 'ready'; ai.wait = Phaser.Math.FloatBetween(0.7, 1.3); e.state = 'idle'; }
-      return;
-    }
-    e.state = 'idle';
-    ai.wait -= dt;
-    const inFlight = this.shots.some(s => s.spear);
-    if (ai.wait <= 0 && !inFlight && standing(p)) {
-      ai.mode = 'swing'; e.lane = p.y; this.startAttack(e, this.def(e).attack);
-      this.say(Phaser.Utils.Array.GetRandom(['다윗을 벽에 박으리라!', '네 이놈…!', '받아라!']), e.x, e.y - 82);
-    }
-  }
-
-  /* ---------- Goliath ---------- */
-  private updateGoliath(e: Fighter, dt: number) {
-    const g = e.g!, p = this.player, K = KB * 1.6;
-    if (e.state === 'down' || e.state === 'dead') { this.physicsDown(e, dt); if (e.state === 'dead') e.gone = true; return; }
-    g.t += dt; g.cd = Math.max(0, g.cd - dt);
-    const go = (m: GMode) => { g.mode = m; g.t = 0; };
-    const dx = p.x - e.x, adx = Math.abs(dx), dy = p.y - e.y;
-    const open = standing(p);
-    const strike = (a: Attack) => {
-      if (e.t >= a.active[0] && e.t <= a.active[1] && !e.hitSet.has(p) && vulnerable(p) && hits(e, a.box, { x: p.x, y: p.y, z: p.z, hw: 6 })) {
-        e.hitSet.add(p); this.applyHit(p, a, e.facing);
-      }
-    };
-    switch (g.mode) {
-      case 'taunt':
-        if (g.t > 2.4) { this.bubble?.destroy(); this.bubble = null; go('walk'); }
-        break;
-      case 'walk':
-        e.facing = dx >= 0 ? 1 : -1;
-        if (adx > 95) e.x += Math.sign(dx) * 34 * dt; else if (adx < 70) e.x -= Math.sign(dx) * 22 * dt;
-        e.y += Math.sign(dy) * Math.min(Math.abs(dy), 24 * dt);
-        if (g.cd <= 0 && open) {
-          if (adx < 58 && Math.abs(dy) < 16) go('sweepA');
-          else if (g.phase2 && Math.random() < 0.35) go('jumpA');
-          else if (adx <= 150 && Math.abs(dy) <= 14) { g.lane = e.y; go('tele'); }
-        }
-        break;
-      case 'tele': // red warning line along his lane, then the thrust
-        if (g.t > 0.65) { go('thrust'); this.startAttack(e, GOLIATH_THRUST); }
-        break;
-      case 'thrust':
-        this.slide(e, dt); strike(GOLIATH_THRUST);
-        if (g.t > 0.25) { g.stuckFor = 1.3; go('stuck'); this.say('빈틈!', e.x + e.facing * 11 * K, e.y - 44 * K); }
-        break;
-      case 'sweepA':
-        if (g.t > 0.45) { go('sweep'); this.startAttack(e, GOLIATH_SWEEP); }
-        break;
-      case 'sweep':
-        strike(GOLIATH_SWEEP);
-        if (g.t > 0.25) go('recover');
-        break;
-      case 'jumpA':
-        if (g.t > 0.5) { go('jump'); e.vz = 300; g.jumpVx = Phaser.Math.Clamp(dx, -220, 220) / 0.8; sfx.jump(); }
-        break;
-      case 'jump':
-        e.x += g.jumpVx * dt; e.z += e.vz * dt; e.vz -= GRAV * dt;
-        if (e.z <= 0) {
-          e.z = 0; e.vz = 0;
-          this.quake = { x: e.x, y: e.y, t: 0, hit: false };
-          this.cameras.main.shake(300, 0.016); sfx.heavy();
-          this.pop('쿵!!', e.x, e.y - 10, true);
-          g.stuckFor = 0.9; go('stuck'); this.say('빈틈!', e.x + e.facing * 11 * K, e.y - 44 * K);
-        }
-        break;
-      case 'stuck': if (g.t > g.stuckFor) go('recover'); break;
-      case 'stagger': if (g.t > 0.9) go('recover'); break;
-      case 'recover': if (g.t > 0.4) { go('walk'); g.cd = g.phase2 ? 0.4 : 0.9; } break;
-    }
-    e.y = Phaser.Math.Clamp(e.y, FLOOR_TOP, FLOOR_BOTTOM);
-    e.x = Phaser.Math.Clamp(e.x, this.camX + 30, this.camX + 450);
-  }
-
   /** Floor shockwave from the slam: jump over it. */
   private updateQuake(dt: number) {
     const q = this.quake, p = this.player;
@@ -856,46 +694,38 @@ export class StageScene extends Phaser.Scene {
     if (q.t > 0.5) this.quake = null;
   }
 
-  private drawGoliathFx(T: number) {
-    this.fxg.clear(); this.topfx.clear();
+  /** On the floor: stealth sight cones, red warning lines before strong attacks, Goliath's shockwave. */
+  private drawFloorFx(T: number) {
+    this.fxg.clear();
     this.drawStealth();
-    for (const e of this.enemies) {
-      const d = this.def(e);
-      if (e.ai?.mode === 'swing' && e.atk && e.t < e.atk.active[0] && (d.ai === 'archer' || d.ai === 'saul') && Math.floor(T * 12) % 2) {
-        const y = e.lane ?? e.y, x0 = e.x + e.facing * 24, len = d.ai === 'saul' ? 480 : 200;
-        this.fxg.fillStyle(0xe63c3c, d.ai === 'saul' ? 0.45 : 0.28).fillRect(e.facing > 0 ? x0 : x0 - len, y - (d.ai === 'saul' ? 6 : 3), len, d.ai === 'saul' ? 12 : 6);
+    if (Math.floor(T * 12) % 2) {
+      for (const w of telegraphs(this.enemies, this.camX)) {
+        this.fxg.fillStyle(0xe63c3c, w.strong ? 0.45 : 0.28).fillRect(Math.min(w.x0, w.x1), w.y - w.half, Math.abs(w.x1 - w.x0), w.half * 2);
+        const a = w.arrows;
+        if (a) for (let i = 0; i < a.n; i++) { const cx = a.from + i * a.step; this.fxg.fillStyle(0xffd0c8, 1).fillTriangle(cx, w.y - 4, cx, w.y + 4, cx + a.dir * a.size, w.y); }
       }
-      if (e.ai?.mode === 'swing' && e.atk?.keep && e.t < e.atk.active[0] && Math.floor(T * 12) % 2) {
-        const x0 = e.x + e.facing * 20;
-        this.fxg.fillStyle(0xe63c3c, 0.45).fillRect(e.facing > 0 ? x0 : x0 - 260, e.y - 6, 260, 12);
-      }
-      if (e.kind === 'camel' && e.t >= 0 && e.t < CAMEL_WARN && e.lane !== undefined && Math.floor(T * 12) % 2) {
-        this.fxg.fillStyle(0xe63c3c, 0.45).fillRect(this.camX, e.lane - 7, 480, 14);
-        for (let i = 0; i < 8; i++) { const cx = this.camX + (e.facing > 0 ? 30 + i * 56 : 450 - i * 56); this.fxg.fillStyle(0xffd0c8, 1).fillTriangle(cx, e.lane - 4, cx, e.lane + 4, cx + e.facing * 7, e.lane); }
-      }
-      if (e.stun && e.state !== 'down') {
-        const k = KB * (d.scale ?? 1), hy = e.y - (isBeast(e.id) ? 30 : 50) * k;
-        for (let i = 0; i < 3; i++) { const a = T * 5 + i * 2.1; this.topfx.fillStyle(0xffe27a, 1).fillRect(Math.round(e.x + Math.cos(a) * 9) - 1, Math.round(hy + Math.sin(a) * 2.5), 3, 1).fillRect(Math.round(e.x + Math.cos(a) * 9), Math.round(hy + Math.sin(a) * 2.5) - 1, 1, 3); }
-      }
-    }
-    const e = this.enemies.find(o => o.g && standing(o)), K = KB * 1.6;
-    if (e?.g?.mode === 'tele' && Math.floor(T * 12) % 2) {
-      const x0 = e.x + e.facing * 24, x1 = e.x + e.facing * 140, y = e.g.lane;
-      this.fxg.fillStyle(0xe63c3c, 0.45).fillRect(Math.min(x0, x1), y - 6, Math.abs(x1 - x0), 12);
-      for (let i = 0; i < 5; i++) {
-        const cx = x0 + e.facing * (14 + i * 22);
-        this.fxg.fillStyle(0xffd0c8, 1).fillTriangle(cx, y - 4, cx, y + 4, cx + e.facing * 6, y);
-      }
-    }
-    if (e?.g?.mode === 'stuck' && Math.floor(T * 10) % 2) {
-      const fx = e.x + e.facing * 11 * K, fy = e.y - 33 * K;
-      this.topfx.lineStyle(2, 0xf2c14e, 1).strokeCircle(fx, fy, 7).fillStyle(0xfff2b0, 0.6).fillCircle(fx, fy, 3);
     }
     const q = this.quake;
     if (q) {
       const r = q.t * 420;
       this.fxg.lineStyle(3, 0xc7a26a, 1 - q.t * 2).strokeEllipse(q.x, q.y, r * 2, r * 0.5);
       this.fxg.lineStyle(2, 0xffffff, 0.8 - q.t * 1.6).strokeEllipse(q.x, q.y, r * 2 - 10, r * 0.5 - 3);
+    }
+  }
+
+  /** Above the sprites: stars over harp-soothed enemies, the target on Goliath's forehead while he's open. */
+  private drawOverheadFx(T: number) {
+    this.topfx.clear();
+    for (const e of this.enemies) {
+      if (e.stun && e.state !== 'down') {
+        const k = KB * (this.def(e).scale ?? 1), hy = e.y - (isBeast(e.id) ? 30 : 50) * k;
+        for (let i = 0; i < 3; i++) { const a = T * 5 + i * 2.1; this.topfx.fillStyle(0xffe27a, 1).fillRect(Math.round(e.x + Math.cos(a) * 9) - 1, Math.round(hy + Math.sin(a) * 2.5), 3, 1).fillRect(Math.round(e.x + Math.cos(a) * 9), Math.round(hy + Math.sin(a) * 2.5) - 1, 1, 3); }
+      }
+    }
+    const e = this.enemies.find(o => o.g && standing(o)), K = KB * 1.6;
+    if (e?.g?.mode === 'stuck' && Math.floor(T * 10) % 2) {
+      const fx = e.x + e.facing * 11 * K, fy = e.y - 33 * K;
+      this.topfx.lineStyle(2, 0xf2c14e, 1).strokeCircle(fx, fy, 7).fillStyle(0xfff2b0, 0.6).fillCircle(fx, fy, 3);
     }
   }
 
@@ -927,113 +757,37 @@ export class StageScene extends Phaser.Scene {
   }
 
   /* ---------- enemies ---------- */
-  private updateEnemy(e: Fighter, dt: number) {
-    if (e.g) { this.updateGoliath(e, dt); return; }
-    const p = this.player, ai = e.ai!, d = this.def(e);
-    ai.cd = Math.max(0, ai.cd - dt);
-    if (d.ai === 'saul') { this.updateSaul(e, dt); return; }
-    if (e.flee && standing(e)) {
-      // their champion is dead: run (1 Sam 17:51)
-      const dir = e.x < this.camX + 240 ? -1 : 1;
-      e.facing = dir; e.state = 'walk'; e.x += dir * 160 * dt;
-      if (e.x < this.camX - 40 || e.x > this.camX + 520) { e.spr.destroy(); e.shadow.destroy(); e.gone = true; }
-      return;
-    }
-    if (e.state === 'down' || e.state === 'dead') { this.physicsDown(e, dt); return; }
-    if (e.state === 'hurt') { this.slide(e, dt); if (e.t > 0.3) { e.state = 'idle'; ai.mode = 'back'; ai.wait = 0.2; } return; }
-    if (e.state === 'getup') { if (e.t > 0.25) { e.state = 'idle'; ai.mode = 'approach'; } return; }
-    if (e.stun) { e.stun = Math.max(0, e.stun - dt); e.state = 'idle'; return; } // soothed by the harp
-    if (d.ai === 'archer') { this.updateArcher(e, dt); return; }
-    if (d.ai === 'camel') { this.updateCamel(e, dt); return; }
-
-    if (d.ai === 'thief' && !e.fights && this.thiefSteal(e, dt)) return;
-
-    // the spot beside David must be on screen while the fight is locked, or a boss pinned to the edge would never reach it
-    if (this.prog.locked && Math.abs(p.x + ai.side * d.reach - (this.camX + 240)) > 224) ai.side = (ai.side * -1) as 1 | -1;
-    const tx = p.x + ai.side * d.reach, ty = Phaser.Math.Clamp(p.y + ai.lane, FLOOR_TOP, FLOOR_BOTTOM);
-    const faceP = () => { e.facing = p.x >= e.x ? 1 : -1; };
-    const playerOpen = standing(p);
-    // bosses: a charge / pounce from range when lined up
-    const sp = d.special, dist = Math.abs(p.x - e.x);
-    if (sp && ai.cd <= 0 && ai.mode !== 'swing' && playerOpen && dist >= sp.from && dist <= sp.to && Math.abs(p.y - e.y) <= DEPTH_TOL) {
-      faceP(); ai.mode = 'swing'; ai.cd = sp.every; this.startAttack(e, sp.attack);
-      return;
-    }
-    switch (ai.mode) {
-      case 'approach': {
-        const dx = tx - e.x, dy = ty - e.y;
-        if (Math.abs(dx) < 5 && Math.abs(dy) < 4) { ai.mode = 'ready'; ai.wait = Phaser.Math.FloatBetween(0.05, 0.35); e.state = 'idle'; break; }
-        e.x += Math.sign(dx) * Math.min(Math.abs(dx), d.speed * dt);
-        e.y += Math.sign(dy) * Math.min(Math.abs(dy), d.speed * 0.65 * dt);
-        e.state = 'walk';
-        faceP();
-        break;
-      }
-      case 'ready': {
-        faceP(); e.state = 'idle';
-        if (Math.abs(tx - e.x) > 12 || Math.abs(ty - e.y) > 8) { ai.mode = 'approach'; break; }
-        ai.wait -= dt;
-        const swinging = this.enemies.filter(o => o.ai?.mode === 'swing').length;
-        if (ai.wait <= 0) {
-          if (swinging < MAX_ATTACKERS && playerOpen && Math.abs(e.y - p.y) <= DEPTH_TOL) { ai.mode = 'swing'; this.startAttack(e, d.attack); }
-          else ai.wait = 0.12;
-        }
-        break;
-      }
-      case 'swing': {
-        const a = e.atk!;
-        if (a.keep && e.t >= a.active[0] - dt) e.x += e.vx * dt; else this.slide(e, dt);
-        if (a.leap && e.t >= a.active[0] && e.t - dt < a.active[0]) e.vz = a.leap;
-        if (e.z > 0 || e.vz > 0) {
-          e.z += e.vz * dt; e.vz -= GRAV * dt;
-          if (e.z <= 0) { e.z = 0; e.vz = 0; e.vx = 0; this.cameras.main.shake(90, 0.006); }
-        }
-        if (e.t >= a.active[0] && e.t <= a.active[1] && !e.hitSet.has(p) && vulnerable(p)
-          && hits(e, a.box, { x: p.x, y: p.y, z: p.z, hw: 6 })) { e.hitSet.add(p); this.applyHit(p, a, e.facing); }
-        if (e.t >= a.dur && e.z <= 0) {
-          const stillClose = dist < d.reach + 14 && Math.abs(p.y - e.y) <= DEPTH_TOL && playerOpen;
-          if (!a.keep && stillClose && Math.random() < CHAIN_CHANCE) { faceP(); this.startAttack(e, d.attack); }
-          else { e.state = 'idle'; ai.mode = 'back'; ai.wait = 0.18; }
-        }
-        break;
-      }
-      case 'back': {
-        e.state = 'walk'; faceP();
-        e.x += ai.side * 40 * dt;
-        ai.wait -= dt;
-        if (ai.wait <= 0) ai.mode = 'approach';
-        break;
-      }
-    }
-    e.y = Phaser.Math.Clamp(e.y, FLOOR_TOP, FLOOR_BOTTOM);
-    if (d.boss) e.x = Phaser.Math.Clamp(e.x, this.camX + 16, this.camX + 464);
+  private world(): World {
+    return { player: this.player, enemies: this.enemies, camX: this.camX, locked: this.prog.locked, shots: this.shots, flock: this.flock, saulDodged: this.saulDodged, rng: () => Math.random() };
   }
 
-  /** Sheep thief: walk to a free sheep, grab it, drag it off the nearer screen edge. Returns false when there's nothing to steal. */
-  private thiefSteal(e: Fighter, dt: number): boolean {
-    if (e.carry) {
-      const dir: 1 | -1 = e.x < this.camX + 240 ? -1 : 1;
-      e.facing = (dir * -1) as 1 | -1; // walks backwards, pulling the sheep
-      e.x += dir * 55 * dt; e.state = 'walk';
-      if (e.x < this.camX - 30 || e.x > this.camX + 510) {
-        const s = e.carry;
+  /** The behaviour lives in think (fighters.ts); this carries out what the enemy decided. */
+  private updateEnemy(e: Fighter, dt: number) {
+    for (const it of think(e, this.world(), dt)) this.act(e, it);
+  }
+
+  private act(e: Fighter, it: Intent) {
+    switch (it.type) {
+      case 'strike': this.applyHit(this.player, it.attack, it.dir); break;
+      case 'fire': this.fire(e, it.spear, it.lane); break;
+      case 'quake': this.quake = { x: it.x, y: it.y, t: 0, hit: false }; break;
+      case 'say': this.say(it.text, it.x, it.y); break;
+      case 'pop': this.pop(it.text, it.x, it.y, true); break;
+      case 'opening': { const K = KB * 1.6; this.say('빈틈!', it.x + it.facing * 11 * K, it.y - 44 * K); break; }
+      case 'shake': this.cameras.main.shake(it.ms, it.amount); break;
+      case 'sound': sfx[it.name](); break;
+      case 'tauntOver': this.bubble?.destroy(); this.bubble = null; break;
+      case 'grab': sfx.baa(); this.say('메에!', it.sheep.x, it.sheep.y - 34); break;
+      case 'stole': {
+        const s = this.flock.find(o => o === it.sheep)!;
         s.img.destroy(); s.shadow.destroy();
         this.flock = this.flock.filter(o => o !== s);
         this.sheepLost++;
         this.say('양을 빼앗겼다!', this.player.x, this.player.y - 70);
-        e.spr.destroy(); e.shadow.destroy(); e.gone = true; // gone with the sheep
+        break;
       }
-      return true;
+      case 'vanish': e.spr.destroy(); e.shadow.destroy(); break;
     }
-    const free = this.flock.filter(s => !s.carrier);
-    if (!free.length) return false;
-    const s = free.reduce((a, b) => (Math.abs(a.x - e.x) < Math.abs(b.x - e.x) ? a : b));
-    const dx = s.x - e.x, dy = s.y - e.y;
-    if (Math.abs(dx) < 16 && Math.abs(dy) < 6) { e.carry = s; s.carrier = e; sfx.baa(); this.say('메에!', s.x, s.y - 34); return true; }
-    e.x += Math.sign(dx) * Math.min(Math.abs(dx), this.def(e).speed * dt);
-    e.y += Math.sign(dy) * Math.min(Math.abs(dy), this.def(e).speed * 0.7 * dt);
-    e.facing = dx >= 0 ? 1 : -1; e.state = 'walk';
-    return true;
   }
 
   /** A stone on the ground, with a bobbing arrow so it's easy to spot. */
@@ -1202,7 +956,8 @@ export class StageScene extends Phaser.Scene {
     this.draw(this.player, T);
     for (const e of this.enemies) this.draw(e, T);
     this.drawHud(T);
-    this.drawGoliathFx(T);
+    this.drawFloorFx(T);
+    this.drawOverheadFx(T);
 
     this.texts.go.setVisible(betweenFights(this.prog) && Math.floor(T * 3) % 2 === 0);
     const end = verdict(this.prog, this.player.state === 'dead');

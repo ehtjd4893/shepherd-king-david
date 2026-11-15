@@ -1,6 +1,7 @@
 // Pure combat rules and stage data types. No Phaser here, so node --test can run it directly.
 
 export const DEPTH_TOL = 12; // px of floor depth (y) within which two fighters share a lane
+export const FLOOR_TOP = 168, FLOOR_BOTTOM = 246, GRAV = 760; // the walkable band of the floor (y); gravity for jumps and falls (px/s²)
 
 export interface Body { x: number; y: number; z: number; facing: 1 | -1 }
 export interface Target { x: number; y: number; z: number; hw: number }

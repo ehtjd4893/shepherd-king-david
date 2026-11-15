@@ -17,8 +17,8 @@ export function tap(k) { key(k, true); run(1); key(k, false); }
 function hold(k, on) { if (!!held[k] !== on) { key(k, on); held[k] = on; } }
 export const scenes = () => window.game.scene.getScenes(true).map(s => s.sys.settings.key).join();
 
-let ST = null;
-export async function setup() { ST = await import('/src/stealth.ts'); window.game.loop.sleep(); T = performance.now(); run(10); }
+let ST = null, F = null;
+export async function setup() { ST = await import('/src/stealth.ts'); F = await import('/src/fighters.ts'); window.game.loop.sleep(); T = performance.now(); run(10); }
 
 /** Play the current stage. god: keep David alive (flow check); returns what happened. */
 export function play({ god = false, seconds = 240 } = {}) {
@@ -30,10 +30,8 @@ export function play({ god = false, seconds = 240 } = {}) {
     const live = s.enemies.filter(e => e.state !== 'dead' && e.state !== 'down' && !e.flee && !s.def(e).untouchable);
     const lethal = s.enemies.filter(e => e.state !== 'dead' && !e.flee);
     let dx = 0, dy = 0, k = null;
-    const laneOf = e => e.lane ?? e.g?.lane ?? e.y;
     const incoming = s.shots.find(sh => Math.abs(sh.y - p.y) <= 14 && (p.x - sh.x) * sh.dir > 0 && Math.abs(p.x - sh.x) < 200);
-    const warn = lethal.find(e => (e.ai?.mode === 'swing' && e.atk && e.t < e.atk.active[0] && (e.atk.keep || ['philD', 'saul'].includes(e.kind)) && Math.abs(laneOf(e) - p.y) <= 16)
-      || (e.g?.mode === 'tele' && Math.abs(e.g.lane - p.y) <= 16));
+    const warn = F.telegraphs(s.enemies, s.camX).find(w => Math.abs(w.y - p.y) <= 16); // the same red lines the player sees
     const G = lethal.find(e => e.g);
     const st = s.stealthRun, goal = st?.goals.find(g => !g.done);
     if (goal) {
@@ -49,7 +47,7 @@ export function play({ god = false, seconds = 240 } = {}) {
     else if (s.quake && p.state !== 'jump' && Math.abs(Math.abs(p.x - s.quake.x) - s.quake.t * 420) < 60) k = 'x';
     else if (incoming || warn || (G && G.g.mode === 'thrust' && Math.abs(G.g.lane - p.y) <= 16)) {
       // step away from the warned lane (not toward the screen middle, which can be the lane itself)
-      const lane = incoming ? incoming.y : warn ? laneOf(warn) : G.g.lane;
+      const lane = incoming ? incoming.y : warn ? warn.y : G.g.lane;
       dy = lane > 232 ? -1 : lane < 182 ? 1 : (p.y >= lane ? 1 : -1);
     }
     else if (G && G.state !== 'down' && G.g.mode === 'stuck') {
