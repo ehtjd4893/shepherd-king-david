@@ -8,10 +8,9 @@ export interface Actor { id: string; x: number; y: number; anim?: string; flip?:
 /** One line. `actors` replaces who is on stage (omit to keep the previous set). */
 /** qte = presses needed (mash the attack button; can't fail); banner = big gold line that pops up (item get). */
 /**
- * bg switches the backdrop from this line on. fx (1 Sam 31): 'battle' = arrows flying over Mount Gilboa; 'dusk' = the light fading;
- * 'gilboa' = faded light, Saul's crown and Jonathan's bow falling to the ground.
+ * bg switches the backdrop from this line on. fx (1 Sam 31): 'battle' = arrows flying over Mount Gilboa; 'dusk' = the light fading.
  */
-export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint' | 'battle' | 'dusk' | 'gilboa'; qte?: number; banner?: string; bg?: Cutscene['bg'] }
+export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint' | 'battle' | 'dusk'; qte?: number; banner?: string; bg?: Cutscene['bg'] }
 export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'wild' | 'ziklag' | 'jebus' | 'zion' | 'gilboa'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } | { scene: 'credits' } }
 
 export const NAMES = { samuel: '사무엘', saul: '사울', jesse: '이새', david: '다윗', goliath: '골리앗', jonathan: '요나단', michal: '미갈', priest: '아히멜렉', achish: '아기스 왕', egypt: '이집트 소년', elder: '이스라엘 장로', lord: '여부스 성주' } as const;
@@ -167,7 +166,6 @@ export const CUTSCENES: Record<string, Cutscene> = {
         text: '그날 사울과 그의 세 아들, 그리고 그의 사람들이 다 함께 죽었다. (삼상 31:6)', fx: 'dusk',
         actors: [{ id: 'jonathanB', x: 132, y: 178, down: true }, { id: 'saul', x: 196, y: 184, anim: 'fall' }],
       },
-      { text: '해가 진 길보아 산 위에는 왕관과 활만이 남았다. (삼하 1:10, 22)', fx: 'gilboa', actors: [] },
       { text: '소식을 들은 다윗은 옷을 찢고, 저녁이 될 때까지 울며 금식했다. (삼하 1:11-12)', bg: 'wild', actors: [{ id: 'davidS', x: 230, y: 190, anim: 'kneel' }] },
       { who: 'david', text: '이스라엘아, 어찌하여 용사들이 엎드러졌는가! 사울과 요나단은 살아 있을 때 사랑스럽고 아름다웠으니… (삼하 1:19, 23)' },
       { who: 'david', text: '내 형 요나단이여, 그대 때문에 내 마음이 아프오. 그대는 내게 참으로 귀한 사람이었소. (삼하 1:26)' },

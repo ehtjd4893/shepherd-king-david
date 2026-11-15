@@ -86,7 +86,7 @@ export class CutsceneScene extends Phaser.Scene {
     this.qteGot = 0; this.scribbles = [];
     if (b.banner) this.banner(b.banner);
     if (b.bg) this.setBackdrop(b.bg);
-    if (b.fx === 'battle' || b.fx === 'dusk' || b.fx === 'gilboa') this.gilboa = b.fx; else if (b.bg) this.gilboa = null;
+    if (b.fx === 'battle' || b.fx === 'dusk') this.gilboa = b.fx; else if (b.bg) this.gilboa = null;
     if (b.fx === 'anoint') this.anointing = true;
     else if (b.actors) this.anointing = false;
     if (b.actors) {
@@ -195,20 +195,9 @@ export class CutsceneScene extends Phaser.Scene {
         this.fx.lineStyle(1, 0xd8c098, 1).lineBetween(x, y, x + 14, y - dy);
         this.fx.fillStyle(0xdfe3e8, 1).fillTriangle(x - 3, y, x + 1, y - 2, x + 1, y + 2).fillStyle(0xf3ecd9, 1).fillRect(x + 12, y - dy - 2, 3, 1).fillRect(x + 12, y - dy + 1, 3, 1);
       }
-    } else if (this.gilboa) {
-      // the light goes; on the last line Saul's crown and Jonathan's bow fall and lie on the slope
-      const dim = this.gilboa === 'dusk' ? Math.min(0.45, this.lineT * 0.2) : 0.55;
-      this.fx.fillStyle(0x12040e, dim).fillRect(0, 0, 480, 270);
-      if (this.gilboa === 'gilboa') {
-        const cy = 40 + Math.min(1, (this.lineT / 1.4) ** 2) * 150, by = 26 + Math.min(1, (this.lineT / 1.8) ** 2) * 166;
-        this.fx.fillStyle(0xf2c14e, 1).fillRect(204, cy, 20, 6).fillTriangle(204, cy, 208, cy - 7, 212, cy).fillTriangle(212, cy, 216, cy - 7, 220, cy).fillTriangle(218, cy, 222, cy - 6, 224, cy);
-        this.fx.fillStyle(0xc0882a, 1).fillRect(204, cy + 4, 20, 2);
-        // the bow lying on its back: the lower part of a circle, string across the top
-        const bx = 266, bcy = by - 12, a0 = 0.35, a1 = Math.PI - 0.35;
-        this.fx.lineStyle(2, 0x9a6a40, 1).beginPath().arc(bx, bcy, 16, a0, a1, false).strokePath();
-        this.fx.lineStyle(1, 0xe8e0cc, 1).lineBetween(bx + 16 * Math.cos(a0), bcy + 16 * Math.sin(a0), bx + 16 * Math.cos(a1), bcy + 16 * Math.sin(a1));
-        if (this.lineT > 1.8 && Math.floor(this.T * 3) % 2) this.fx.fillStyle(0xffffff, 1).fillRect(213, cy - 3, 1, 3).fillRect(212, cy - 2, 3, 1); // a glint on the crown
-      }
+    } else if (this.gilboa === 'dusk') {
+      // the light goes as Saul falls
+      this.fx.fillStyle(0x12040e, Math.min(0.45, this.lineT * 0.2)).fillRect(0, 0, 480, 270);
     }
     this.ui.clear();
     const q = b.qte;
