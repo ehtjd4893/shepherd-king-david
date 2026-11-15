@@ -20,7 +20,7 @@ const SLING_SEQ: [string, number, number][] = [['sling', 0, 0.05], ['sling', 2, 
 type Img = Phaser.GameObjects.Image;
 type Txt = Phaser.GameObjects.Text;
 /** What the scene draws for a stealth section: a sprite and a ?/! mark per guard, the marks over each goal. */
-interface StealthView { sentries: { spr: Img; mark: Txt }[]; goals: Phaser.GameObjects.GameObject[][] }
+interface StealthView { sentries: { spr: Img; mark: Txt; zz?: Txt }[]; goals: Phaser.GameObjects.GameObject[][] }
 
 /**
  * The stage on screen. The game itself runs in StageSim (sim.ts); this scene feeds it input, draws its state
@@ -427,10 +427,10 @@ export class StageScene extends Phaser.Scene {
     const view: StealthView = { sentries: [], goals: [] };
     for (const { g } of run.sentries) {
       const key = g.asleep ? this.tex('guard', 'hurt', 0, true) : this.tex('guard', 'idle', 0);
-      if (g.asleep) this.add.text(at + g.x - 6, g.y - 30, 'Zz', { fontFamily: FONT, fontSize: '10px', color: '#ffffff', stroke: '#0d0a14', strokeThickness: 2 }).setDepth(960);
       view.sentries.push({
         spr: this.show(this.add.image(at + g.x, g.y, 'shadow'), key).setDepth(g.y + 10),
         mark: this.add.text(at + g.x, g.y - 70, '', { fontFamily: FONT, fontSize: '16px', color: '#ffe27a', stroke: '#7a2416', strokeThickness: 3 }).setOrigin(0.5).setDepth(960),
+        zz: g.asleep ? this.add.text(at + g.x - 6, g.y - 30, 'Zz', { fontFamily: FONT, fontSize: '10px', color: '#ffffff', stroke: '#0d0a14', strokeThickness: 2 }).setDepth(960) : undefined,
       });
     }
     for (const { g } of run.goals) {
@@ -448,12 +448,20 @@ export class StageScene extends Phaser.Scene {
     const run = this.sim.stealthRun, v = this.stealthView;
     if (!run || !v) return;
     run.sentries.forEach((s, i) => {
-      const { spr, mark } = v.sentries[i];
+      const { spr, mark, zz } = v.sentries[i];
       if (!s.g.asleep) {
         this.show(spr, this.tex('guard', s.wait > 0 ? 'idle' : 'walk', s.wait > 0 ? Math.floor(T * 2.5) % 2 : Math.floor(T * 6) % 4))
           .setFlipX(s.facing < 0).setPosition(Math.round(s.x), s.y);
+      } else if (s.nap === 'look') {
+        this.show(spr, this.tex('guard', 'idle', 0)).setFlipX(s.facing < 0).setPosition(s.x, s.y); // up on an elbow, looking around
+      } else {
+        // lying down; tossing and turning just before he looks up
+        this.show(spr, this.tex('guard', 'hurt', 0, true)).setFlipX(false).setPosition(s.x + (s.nap === 'stir' ? (Math.floor(T * 16) % 2 ? 1 : -1) : 0), s.y);
       }
-      mark.setPosition(s.x, s.y - (s.g.asleep ? 34 : 70)).setText(s.meter >= 1 ? '!' : s.meter > 0 ? '?' : '').setColor(s.meter > 0.5 ? '#ff7a6a' : '#ffe27a');
+      zz?.setVisible(s.nap === 'sleep');
+      const up = s.g.asleep && s.nap === 'look';
+      mark.setPosition(s.x, s.y - (s.g.asleep && !up ? 34 : 70))
+        .setText(s.meter >= 1 ? '!' : s.meter > 0 ? '?' : s.nap === 'stir' ? '…' : '').setColor(s.meter > 0.5 ? '#ff7a6a' : '#ffe27a');
     });
     run.goals.forEach((g, i) => { if (!g.done) (v.goals[i][v.goals[i].length - 1] as Txt).setY(g.g.y - (g.g.kind === 'spear' ? 66 : 26) - Math.abs(Math.sin(T * 6)) * 4); });
   }
@@ -463,11 +471,12 @@ export class StageScene extends Phaser.Scene {
     const s = this.sim;
     this.fxg.clear();
     for (const g of s.stealthRun?.sentries ?? []) {
-      if (g.g.asleep) continue;
+      if (g.nap === 'sleep') continue;
       const far = g.x + g.facing * SIGHT_RANGE, spread = 8 + SIGHT_RANGE * 0.22;
       const col = g.meter > 0.5 ? 0xff5a4a : 0xffe27a;
-      this.fxg.fillStyle(col, 0.34).fillTriangle(g.x, g.y - 2, far, g.y - spread, far, g.y + spread);
-      this.fxg.lineStyle(1, col, 0.9).strokeTriangle(g.x, g.y - 2, far, g.y - spread, far, g.y + spread);
+      // a sleeper about to look up: just the outline of where he'll look
+      if (g.nap !== 'stir') this.fxg.fillStyle(col, 0.34).fillTriangle(g.x, g.y - 2, far, g.y - spread, far, g.y + spread);
+      this.fxg.lineStyle(1, col, g.nap === 'stir' ? 0.5 : 0.9).strokeTriangle(g.x, g.y - 2, far, g.y - spread, far, g.y + spread);
     }
     if (Math.floor(T * 12) % 2) {
       for (const w of telegraphs(s.enemies, s.camX)) {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { think, arrive, telegraphs, MAX_ATTACKERS, CHAIN_CHANCE, type Actor, type World, type Intent, type SheepBody } from './fighters.ts';
-import { ENEMIES, CAMEL_WARN, SAUL_DODGES, type EnemyId, type Spawn } from './combat.ts';
+import { ENEMIES, CAMEL_WARN, SAUL_DODGES, SAUL_LOCK, saulThrow, type EnemyId, type Spawn } from './combat.ts';
 
 const dt = 1 / 60;
 const actor = (kind: EnemyId | undefined, x: number, y = 200, more: Partial<Actor> = {}): Actor => ({
@@ -69,6 +69,30 @@ test('Saul throws only when no spear is in flight, and walks off after three dod
   const out = run(leaving, world(david, [leaving], { saulDodged: SAUL_DODGES }), 2);
   assert.equal(leaving.gone, true);
   assert.ok(out.some(i => i.type === 'vanish'));
+});
+
+test("Saul's aim follows David, leads him if he keeps walking, then holds just before the throw", () => {
+  const david = actor(undefined, 200, 210), saul = enemy('saul', 430, 196), w = world(david, [saul]);
+  saul.ai!.wait = 0;
+  think(saul, w, dt); // starts aiming at 210
+  const a = saul.atk!, held = a.active[0] - SAUL_LOCK;
+  for (let i = 0; i < 12; i++) { saul.t += dt; david.y += 80 * dt; think(saul, w, dt); } // David walks down the screen
+  assert.ok(saul.lane! > david.y + 10, `aim ${saul.lane} should be ahead of David at ${david.y}`);
+  while (saul.t < held) { saul.t += dt; think(saul, w, dt); }
+  const lane = saul.lane!;
+  assert.ok(telegraphs([saul], 0)[0].half > 6, 'the line thickens once the aim holds');
+  david.y = 180;
+  const shots: Intent[] = [];
+  while (saul.ai!.mode === 'swing') { saul.t += dt; shots.push(...think(saul, w, dt)); }
+  assert.deepEqual(shots.filter(i => i.type === 'fire'), [{ type: 'fire', spear: true, lane }]);
+});
+
+test('Saul winds up quicker after each dodge, and stops waiting for the last spear', () => {
+  assert.ok(saulThrow(0).active[0] > saulThrow(1).active[0] && saulThrow(1).active[0] > saulThrow(2).active[0]);
+  const david = actor(undefined, 200, 210), saul = enemy('saul', 430, 196);
+  saul.ai!.wait = 0;
+  think(saul, world(david, [saul], { shots: [{ spear: true }], saulDodged: 1 }), dt);
+  assert.equal(saul.ai!.mode, 'swing');
 });
 
 test('Goliath is open (stuck) only right after a thrust or a slam', () => {

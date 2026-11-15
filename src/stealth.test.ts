@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  seen, heard, suspicion, startStealth, stepStealth, entry, SIGHT_RANGE, HEAR_RANGE, HEAR_RATE, PATROL_SPEED, LOOK_AROUND, START_GRACE, CAUGHT_GRACE,
+  seen, heard, suspicion, startStealth, stepStealth, entry, NAP, SIGHT_RANGE, HEAR_RANGE, HEAR_RATE, PATROL_SPEED, LOOK_AROUND, START_GRACE, CAUGHT_GRACE,
   type StealthRun, type StealthEvent,
 } from './stealth.ts';
 import type { Section } from './combat.ts';
@@ -98,4 +98,37 @@ test('the section is done once every goal is taken', () => {
 
 test('David starts (and restarts) at the near edge of the section', () => {
   assert.deepEqual(entry(startStealth(cave)), { x: 1030, y: 210 });
+});
+
+// a night camp with one sleeper at 200, Saul to his right (so he first turns over to face right)
+const camp: Section = {
+  at: 1000, waves: [],
+  stealth: { mood: 'night', saul: { x: 360, y: 214 }, guards: [{ x: 200, y: 200, asleep: true }], goals: [{ x: 400, y: 210, kind: 'spear' }] },
+};
+const inFront = (st: StealthRun, state: string) => ({ x: st.sentries[0].x + 50, y: 200, state });
+
+test('a sleeper sleeps, stirs and turns over, then looks around for a moment, and sleeps again', () => {
+  const st = startStealth(camp), s = st.sentries[0];
+  run(st, NAP.first - 0.05, hidden);
+  assert.deepEqual([s.nap, s.facing], ['sleep', -1]);
+  run(st, 0.1, hidden);
+  assert.deepEqual([s.nap, s.facing], ['stir', 1]);
+  run(st, NAP.stir, hidden);
+  assert.equal(s.nap, 'look');
+  run(st, NAP.look, hidden);
+  assert.equal(s.nap, 'sleep');
+});
+
+test('walking past a sleeper is safe; while he looks, moving in front of him gets David caught, standing still does not', () => {
+  const st = startStealth(camp);
+  assert.deepEqual(run(st, NAP.first + NAP.stir - 0.05, inFront(st, 'walk')), []);
+  assert.equal(st.sentries[0].meter, 0);
+  run(st, 0.1, inFront(st, 'idle'));
+  assert.equal(st.sentries[0].nap, 'look');
+  assert.deepEqual(run(st, 0.5, inFront(st, 'idle')), []); // frozen right in front of him
+  assert.equal(st.sentries[0].meter, 0);
+  let caught = false;
+  for (let i = 0; i < Math.round(0.7 / dt) && !caught; i++) caught = stepStealth(st, dt, inFront(st, 'walk'), false).some(e => e.type === 'caught');
+  assert.equal(caught, true);
+  assert.deepEqual([st.sentries[0].nap, st.sentries[0].wait], ['sleep', NAP.first]); // back asleep as at the start
 });

@@ -56,6 +56,8 @@ const LION_POUNCE: Attack = { pose: 'atk', dur: 0.95, active: [0.45, 0.9], box: 
 /** Archer: aim (bow drawn, warning line), loose at active[0]; the arrow itself does the damage. */
 /** Philistine captain: crouches behind his shield, then charges down the lane. */
 const SHIELD_CHARGE: Attack = { pose: 'atk', dur: 0.9, active: [0.45, 0.85], box: { from: -4, to: 40, height: 40 }, dmg: 14, knock: true, lunge: 230, keep: true };
+/** His sword: heavier and a little longer than a foot soldier's. */
+const CAPTAIN_SLASH: Attack = { pose: 'atk', dur: 0.4, active: [0.2, 0.3], box: { from: 0, to: 42, height: 34 }, dmg: 13, knock: false, lunge: 130 };
 const SCIMITAR: Attack = { pose: 'atk', dur: 0.34, active: [0.18, 0.26], box: { from: 0, to: 36, height: 30 }, dmg: 10, knock: false, lunge: 120 };
 /** Camel rider: the whole crossing is one long active window; the warning comes first (see camelPhase). */
 const CAMEL_CHARGE: Attack = { pose: 'walk', dur: 99, active: [0, 99], box: { from: -12, to: 22, height: 40 }, dmg: 14, knock: true, lunge: 0 };
@@ -68,6 +70,12 @@ const LORD_CHARGE: Attack = { pose: 'atk', dur: 0.9, active: [0.45, 0.85], box: 
 const ARROW_SHOT: Attack = { pose: 'atk', dur: 0.8, active: [0.6, 0.6], box: { from: 0, to: 0, height: 0 }, dmg: 8, knock: false, lunge: 0 };
 /** Saul: raise the spear over the lane for a moment, then hurl it. */
 const SAUL_THROW: Attack = { pose: 'throw', dur: 1.1, active: [0.8, 0.8], box: { from: 0, to: 0, height: 0 }, dmg: 22, knock: true, lunge: 0 };
+/** Each spear David dodges makes Saul wind up quicker. */
+export const SAUL_TEMPO = [1, 0.8, 0.65];
+export function saulThrow(dodged: number): Attack {
+  const k = SAUL_TEMPO[Math.min(dodged, SAUL_TEMPO.length - 1)];
+  return { ...SAUL_THROW, dur: SAUL_THROW.dur * k, active: [SAUL_THROW.active[0] * k, SAUL_THROW.active[1] * k] };
+}
 
 export interface EnemyDef {
   name: string; hp: number; speed: number; reach: number; hw: number; attack: Attack;
@@ -76,8 +84,8 @@ export interface EnemyDef {
   untouchable?: boolean;
   /** extra move used from a distance (bear charge, lion pounce) */
   special?: { attack: Attack; from: number; to: number; every: number };
-  /** calls for help each time his health drops past a CHIEF_CALLS mark: camel riders / guards */
-  calls?: 'camels' | 'guards';
+  /** calls for help each time his health drops past a CHIEF_CALLS mark: camel riders / guards / Philistine soldiers */
+  calls?: 'camels' | 'guards' | 'philistines';
 }
 export const ENEMIES = {
   philA: { name: '블레셋 보병', hp: 40, speed: 95, reach: 34, hw: 6, attack: SOLDIER_SLASH, ai: 'soldier' },
@@ -88,10 +96,10 @@ export const ENEMIES = {
   bear: { name: '곰', hp: 150, speed: 62, reach: 44, hw: 16, attack: BEAR_SWIPE, ai: 'soldier', boss: true, special: { attack: BEAR_CHARGE, from: 110, to: 260, every: 3.5 } },
   philD: { name: '블레셋 궁수', hp: 26, speed: 80, reach: 150, hw: 6, attack: ARROW_SHOT, ai: 'archer' },
   saul: { name: '사울 왕', hp: 9999, speed: 0, reach: 0, hw: 8, attack: SAUL_THROW, ai: 'saul', untouchable: true },
-  captain: { name: '블레셋 대장', hp: 160, speed: 85, reach: 38, hw: 8, attack: SOLDIER_SLASH, ai: 'soldier', boss: true, scale: 1.3, special: { attack: SHIELD_CHARGE, from: 90, to: 240, every: 3 } },
+  captain: { name: '블레셋 대장', hp: 260, speed: 100, reach: 40, hw: 8, attack: CAPTAIN_SLASH, ai: 'soldier', boss: true, scale: 1.3, special: { attack: SHIELD_CHARGE, from: 70, to: 280, every: 2.2 }, calls: 'philistines' },
   amalek: { name: '아말렉 병사', hp: 34, speed: 100, reach: 36, hw: 6, attack: SCIMITAR, ai: 'soldier' },
   camel: { name: '낙타 기병', hp: 20, speed: 0, reach: 0, hw: 14, attack: CAMEL_CHARGE, ai: 'camel' },
-  chief: { name: '아말렉 대장', hp: 180, speed: 95, reach: 40, hw: 9, attack: CHIEF_SWEEP, ai: 'soldier', boss: true, scale: 1.35, special: { attack: CHIEF_CHARGE, from: 90, to: 240, every: 3.2 }, calls: 'camels' },
+  chief: { name: '아말렉 대장', hp: 220, speed: 100, reach: 40, hw: 9, attack: CHIEF_SWEEP, ai: 'soldier', boss: true, scale: 1.35, special: { attack: CHIEF_CHARGE, from: 80, to: 260, every: 2.6 }, calls: 'camels' },
   jebusite: { name: '여부스 병사', hp: 36, speed: 90, reach: 60, hw: 6, attack: SOLDIER_THRUST, ai: 'soldier' },
   jebArcher: { name: '여부스 궁수', hp: 26, speed: 80, reach: 150, hw: 6, attack: ARROW_SHOT, ai: 'archer' },
   lord: { name: '여부스 성주', hp: 200, speed: 80, reach: 56, hw: 9, attack: LORD_THRUST, ai: 'soldier', boss: true, scale: 1.4, special: { attack: LORD_CHARGE, from: 100, to: 260, every: 3 }, calls: 'guards' },
@@ -166,7 +174,12 @@ export function brookShouldDrop(ammo: number, onGround: number, since: number): 
 }
 
 // ---------- Gibeah (1 Sam 18-19) ----------
-export const ARROW_SPEED = 250, SPEAR_SPEED = 330, SAUL_DODGES = 3;
+export const ARROW_SPEED = 250, SPEAR_SPEED = 460, SAUL_DODGES = 3;
+/**
+ * Saul's aim follows David's lane (px/s, faster than David walks), aiming SAUL_LEAD s ahead of him if he keeps walking,
+ * until SAUL_LOCK s before the throw; then it holds still. Walking on doesn't save David: move (or jump) once it stops.
+ */
+export const SAUL_AIM = 160, SAUL_LOCK = 0.25, SAUL_LEAD = 0.6;
 /** Projectile hitbox around the arrow/spear; height lets a jump clear it. */
 export const SHOT_BOX: Box = { from: -8, to: 8, height: 22 };
 /** Harp (replaces the faith strike from stage 3): soothes everyone on screen — they nod off, David recovers (1 Sam 16:23). */
@@ -193,7 +206,7 @@ export const ALLY_RUSH: Attack = { pose: 'walk', dur: 0, active: [0, 0], box: { 
 /** Camel riders wait at the screen edge with a warning line over their lane, then gallop across it. */
 export const CAMEL_WARN = 0.9, CAMEL_SPEED = 280;
 export function camelPhase(t: number): 'warn' | 'charge' { return t < CAMEL_WARN ? 'warn' : 'charge'; }
-/** The chief calls camel riders each time his health drops past one of these. */
+/** The chief calls camel riders (and the other captains their men) each time his health drops past one of these. */
 export const CHIEF_CALLS = [120, 60];
 export function chiefCalls(before: number, after: number): number {
   return CHIEF_CALLS.filter(h => before > h && after <= h).length;

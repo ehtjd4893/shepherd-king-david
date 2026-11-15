@@ -2,7 +2,7 @@
 // No Phaser here — a brain changes its own enemy and returns intents (strike David, loose an arrow, shake the screen…);
 // the scene carries those out. Randomness comes in through World.rng so a run can be replayed.
 import {
-  hits, archerStep, camelPhase, CAMEL_SPEED, CAMEL_WARN, SAUL_DODGES, GOLIATH_THRUST, GOLIATH_SWEEP, DEPTH_TOL, ENEMIES, FLOOR_TOP, FLOOR_BOTTOM, GRAV,
+  hits, archerStep, camelPhase, CAMEL_SPEED, CAMEL_WARN, SAUL_DODGES, SAUL_AIM, SAUL_LOCK, SAUL_LEAD, saulThrow, GOLIATH_THRUST, GOLIATH_SWEEP, DEPTH_TOL, ENEMIES, FLOOR_TOP, FLOOR_BOTTOM, GRAV,
   type Attack, type EnemyDef, type EnemyId, type Spawn,
 } from './combat.ts';
 import { standing, vulnerable } from './hit.ts';
@@ -24,6 +24,8 @@ export interface Actor {
   carry?: SheepBody; fights?: boolean; // sheep thief: carrying a sheep / gave up stealing
   /** gone: off the field (Goliath's is set when he's beaten; his body stays where he fell) */
   g?: GState; flee?: boolean; gone?: boolean; stun?: number; lane?: number;
+  /** Saul: where David stood last frame (to lead his aim) */
+  seenY?: number;
 }
 /** What a brain can see of the world this frame. */
 export interface World {
@@ -206,7 +208,7 @@ function archer(e: Actor, w: World, dt: number, out: Intent[]) {
   }
 }
 
-/** King Saul: can't be fought. He raises the spear over David's lane and hurls it — dodge it three times (1 Sam 18:11, 19:10). */
+/** King Saul: can't be fought. He aims the spear at David's lane and hurls it, quicker each time — dodge it three times (1 Sam 18:11, 19:10). */
 function saul(e: Actor, w: World, dt: number, out: Intent[]) {
   const p = w.player, ai = e.ai!;
   e.facing = p.x >= e.x ? 1 : -1;
@@ -218,15 +220,22 @@ function saul(e: Actor, w: World, dt: number, out: Intent[]) {
   }
   if (ai.mode === 'swing') {
     const a = e.atk!;
-    if (e.t >= a.active[0] && e.t - dt < a.active[0]) out.push({ type: 'fire', spear: true, lane: e.lane ?? p.y });
-    if (e.t >= a.dur) { ai.mode = 'ready'; ai.wait = floatBetween(w.rng, 0.7, 1.3); e.state = 'idle'; }
+    if (e.t < a.active[0] - SAUL_LOCK) {
+      // his aim follows David, leading him if he keeps walking…
+      const vy = (p.y - (e.seenY ?? p.y)) / dt, want = clamp(p.y + vy * SAUL_LEAD, FLOOR_TOP, FLOOR_BOTTOM), lane = e.lane ?? p.y;
+      e.lane = clamp(want, lane - SAUL_AIM * dt, lane + SAUL_AIM * dt);
+    }
+    e.seenY = p.y;
+    if (e.t >= a.active[0] && e.t - dt < a.active[0]) out.push({ type: 'fire', spear: true, lane: e.lane ?? p.y }); // …then holds, and the spear flies
+    if (e.t >= a.dur) { ai.mode = 'ready'; ai.wait = w.saulDodged ? floatBetween(w.rng, 0.15, 0.4) : floatBetween(w.rng, 0.5, 1); e.state = 'idle'; }
     return;
   }
   e.state = 'idle';
   ai.wait -= dt;
-  const inFlight = w.shots.some(s => s.spear);
+  // the first spear he watches all the way; once David has dodged one, the next comes while the last is still flying
+  const inFlight = !w.saulDodged && w.shots.some(s => s.spear);
   if (ai.wait <= 0 && !inFlight && standing(p)) {
-    ai.mode = 'swing'; e.lane = p.y; startAttack(e, def(e).attack);
+    ai.mode = 'swing'; e.lane = p.y; startAttack(e, saulThrow(w.saulDodged));
     out.push({ type: 'say', text: pick(w.rng, ['다윗을 벽에 박으리라!', '네 이놈…!', '받아라!']), x: e.x, y: e.y - 82 });
   }
 }
@@ -341,7 +350,8 @@ export function telegraphs(enemies: Actor[], camX: number): Telegraph[] {
     const d = def(e), aiming = e.ai?.mode === 'swing' && e.atk && e.t < e.atk.active[0];
     if (aiming && (d.ai === 'archer' || d.ai === 'saul')) {
       const x0 = e.x + e.facing * 24, len = d.ai === 'saul' ? 480 : 200;
-      out.push({ y: e.lane ?? e.y, x0, x1: x0 + e.facing * len, half: d.ai === 'saul' ? 6 : 3, strong: d.ai === 'saul' });
+      const held = d.ai === 'saul' && e.t >= e.atk!.active[0] - SAUL_LOCK; // Saul's aim stopped moving: the line thickens
+      out.push({ y: e.lane ?? e.y, x0, x1: x0 + e.facing * len, half: d.ai === 'saul' ? (held ? 9 : 5) : 3, strong: d.ai === 'saul' });
     }
     if (aiming && e.atk!.keep) {
       const x0 = e.x + e.facing * 20;

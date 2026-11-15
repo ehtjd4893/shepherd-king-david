@@ -470,9 +470,11 @@ export class StageSim {
       if (open && hits({ x: s.x, y: s.y, z: s.z - 26 * KB, facing: s.dir }, SHOT_BOX, { x: p.x, y: p.y, z: p.z, hw: 6 })) {
         this.applyHit(p, { ...COMBO[0], dmg: s.dmg, knock: s.knock }, s.dir);
         s.x = Infinity;
+        // Saul's spear: the three dodges must come in a row
+        if (s.spear && this.saulDodged > 0 && this.saulDodged < SAUL_DODGES) { this.saulDodged = 0; this.pop('처음부터 다시!', p.x, p.y - 70, true); }
       } else if (s.spear && !s.passed && (s.x - p.x) * s.dir > 24) {
         s.passed = true; this.saulDodged++;
-        this.pop(this.saulDodged >= SAUL_DODGES ? '세 번 피했다!' : '피했다!', p.x, p.y - 70, true);
+        this.pop(this.saulDodged >= SAUL_DODGES ? '세 번 피했다!' : `피했다! ${this.saulDodged}/${SAUL_DODGES}`, p.x, p.y - 70, true);
         this.shake(80, 0.004);
       }
     }

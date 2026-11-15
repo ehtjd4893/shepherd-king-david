@@ -44,6 +44,7 @@ export interface HitOutcome {
 const CALLS: Record<NonNullable<EnemyDef['calls']>, (n: number) => { spawns: Spawn[]; shout: string }> = {
   camels: n => ({ spawns: Array.from({ length: n * 2 }, (_, i) => ({ x: i % 2 ? -40 : 520, y: 210, t: 'camel' as const })), shout: '낙타 기병이다!' }),
   guards: () => ({ spawns: [{ x: -40, y: 200, t: 'jebusite' }, { x: 520, y: 230, t: 'jebArcher' }], shout: '성주를 지켜라!' }),
+  philistines: () => ({ spawns: [{ x: -40, y: 206, t: 'philB' }, { x: 520, y: 230, t: 'philD' }], shout: '대장을 지켜라!' }),
 };
 const GOLIATH_RAGE_HP = 50;
 
