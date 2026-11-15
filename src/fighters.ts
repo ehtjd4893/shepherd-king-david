@@ -46,6 +46,9 @@ export type Intent =
   | { type: 'vanish' }; // this enemy left the field: remove its sprite
 
 export const def = (e: Actor): EnemyDef => ENEMIES[e.kind ?? 'philA'];
+export function newFighter(id: string, name: string, x: number, y: number, hp: number): Actor {
+  return { id, name, x, y, z: 0, vx: 0, vz: 0, facing: 1, hp, maxHp: hp, state: 'idle', t: 0, inv: 0, flash: 0, combo: 0, queued: false, hitSet: new Set(), airAtk: false };
+}
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const between = (rng: () => number, a: number, b: number) => Math.floor(rng() * (b - a + 1) + a);
 const floatBetween = (rng: () => number, a: number, b: number) => rng() * (b - a) + a;

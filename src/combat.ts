@@ -113,6 +113,20 @@ export const DOUBLE_TAP = 0.25; // s between two taps of the same direction to s
 export function isDoubleTap(prevDir: number, prevAt: number, dir: number, now: number): boolean {
   return dir !== 0 && dir === prevDir && now - prevAt <= DOUBLE_TAP;
 }
+export interface RunTracker { run: boolean; prevX: number; lastDir: number; lastAt: number }
+export const runTracker = (): RunTracker => ({ run: false, prevX: 0, lastDir: 0, lastAt: -1 });
+/** Running, frame by frame: a double tap starts it, letting go or turning around stops it, a stick pushed all the way runs too. */
+export function trackRun(r: RunTracker, x: number, now: number, fullTilt: boolean): boolean {
+  // a fresh horizontal press: check for a double tap
+  if (x !== 0 && x !== r.prevX) {
+    if (isDoubleTap(r.lastDir, r.lastAt, x, now)) r.run = true;
+    r.lastDir = x; r.lastAt = now;
+  }
+  if (x === 0 || (r.prevX !== 0 && x !== r.prevX)) r.run = false;
+  r.run ||= fullTilt && x !== 0;
+  r.prevX = x;
+  return r.run;
+}
 
 export interface Spawn { x: number; y: number; t?: EnemyId } // x is relative to the section's screen (0..480); <0 or >480 = walks in
 /** Stealth section (1 Sam 24, 26): Saul's men can't be fought; take the goals without being caught. Positions are screen-relative. */

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { isDoubleTap } from './combat.ts';
+import { trackRun, runTracker } from './combat.ts';
 
 /**
  * Touch buttons live in the page (not in the 480×270 game canvas), so they are sized in real screen pixels
@@ -52,8 +52,7 @@ export class Controls {
   private stick: { id: number; x: number; y: number } | null = null;
   private touched: Partial<Record<BtnName, boolean>> = {};
   private btns: Partial<Record<BtnName, HTMLElement>> = {};
-  private lastTap = { dir: 0, at: -1 };
-  private prevX = 0;
+  private running = runTracker();
 
   constructor(private scene: Phaser.Scene) {
     this.keys = scene.input.keyboard!.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,S,Z,X,J,K,C,L,V,F,G,SEMICOLON') as Record<string, Phaser.Input.Keyboard.Key>;
@@ -138,14 +137,7 @@ export class Controls {
       y ||= Math.abs(this.stick.y) > 0.35 ? Math.sign(this.stick.y) : 0;
       fullTilt ||= Math.abs(this.stick.x) > 0.95;
     }
-    // a fresh horizontal press: check for a double tap
-    if (x !== 0 && x !== this.prevX) {
-      if (isDoubleTap(this.lastTap.dir, this.lastTap.at, x, now)) this.run = true;
-      this.lastTap = { dir: x, at: now };
-    }
-    if (x === 0 || (this.prevX !== 0 && x !== this.prevX)) this.run = false;
-    this.run ||= fullTilt && x !== 0;
-    this.prevX = x;
+    this.run = trackRun(this.running, x, now, fullTilt);
     this.x = x;
     this.y = y;
 
