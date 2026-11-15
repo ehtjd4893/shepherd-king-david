@@ -1,12 +1,18 @@
 // Story scenes. Lines paraphrase 1 Samuel in plain Korean; chapter:verse goes in narration only.
 
-/** A figure on stage. `from` = walk in from this x when the line starts; k = size (Goliath is big); down = lying on the ground. */
+/**
+ * A figure on stage. `from` = walk in from this x when the line starts; k = size (Goliath is big); down = lying on the ground.
+ * anim 'fight' = trading blows (two frames); 'fall' = topples over and stays down.
+ */
 export interface Actor { id: string; x: number; y: number; anim?: string; flip?: boolean; from?: number; k?: number; down?: boolean }
 /** One line. `actors` replaces who is on stage (omit to keep the previous set). */
 /** qte = presses needed (mash the attack button; can't fail); banner = big gold line that pops up (item get). */
-/** bg switches the backdrop from this line on; fx 'gilboa' = dark mountain with Saul's crown and Jonathan's bow falling (1 Sam 31). */
-export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint' | 'gilboa'; qte?: number; banner?: string; bg?: Cutscene['bg'] }
-export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'wild' | 'ziklag' | 'jebus' | 'zion' | 'dark'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } | { scene: 'credits' } }
+/**
+ * bg switches the backdrop from this line on. fx (1 Sam 31): 'battle' = arrows flying over Mount Gilboa; 'dusk' = the light fading;
+ * 'gilboa' = faded light, Saul's crown and Jonathan's bow falling to the ground.
+ */
+export interface Beat { who?: keyof typeof NAMES; text: string; actors?: Actor[]; fx?: 'anoint' | 'battle' | 'dusk' | 'gilboa'; qte?: number; banner?: string; bg?: Cutscene['bg'] }
+export interface Cutscene { bg: 'beth' | 'field' | 'elah' | 'gibeah' | 'wild' | 'ziklag' | 'jebus' | 'zion' | 'gilboa'; title?: string; beats: Beat[]; next: { scene: 'stage' | 'cutscene'; id: string } | { scene: 'title' } | { scene: 'credits' } }
 
 export const NAMES = { samuel: '사무엘', saul: '사울', jesse: '이새', david: '다윗', goliath: '골리앗', jonathan: '요나단', michal: '미갈', priest: '아히멜렉', achish: '아기스 왕', egypt: '이집트 소년', elder: '이스라엘 장로', lord: '여부스 성주' } as const;
 
@@ -134,8 +140,34 @@ export const CUTSCENES: Record<string, Cutscene> = {
     beats: [
       { text: '다윗은 아말렉이 빼앗아 간 모든 것을 되찾았다. 작은 것 하나 잃은 것이 없었다. (삼상 30:18-19)', actors: [{ id: 'davidS', x: 200, y: 190 }, { id: 'villager', x: 260, y: 186, flip: true }, { id: 'child', x: 300, y: 190, flip: true }] },
       { who: 'david', text: '싸우러 나간 사람의 몫이나, 짐 곁에 남은 사람의 몫이나 똑같아야 한다! (삼상 30:24)' },
-      { text: '그 무렵, 길보아 산에서 블레셋과 이스라엘의 큰 싸움이 있었다. (삼상 31:1)', bg: 'dark', fx: 'gilboa', actors: [] },
-      { text: '그날 사울과 요나단은 함께 전사했다. 산 위에는 왕관과 활만이 남았다. (삼상 31:6, 삼하 1:10)' },
+      {
+        text: '그 무렵, 블레셋 사람들이 길보아 산에서 이스라엘과 싸웠다. 사울과 요나단도 맨 앞에서 싸웠다. (삼상 31:1)', bg: 'gilboa', fx: 'battle',
+        actors: [
+          { id: 'guard', x: 70, y: 182, anim: 'fight' }, { id: 'jonathanB', x: 122, y: 172, anim: 'fight' }, { id: 'saul', x: 178, y: 186, anim: 'fight' },
+          { id: 'philB', x: 262, y: 184, flip: true, anim: 'fight' }, { id: 'philA', x: 300, y: 174, flip: true, anim: 'fight' }, { id: 'philC', x: 344, y: 190, flip: true, anim: 'fight' },
+          { id: 'philD', x: 404, y: 170, flip: true, anim: 'fight' }, { id: 'philD', x: 446, y: 184, flip: true, anim: 'fight' },
+        ],
+      },
+      {
+        text: '블레셋 사람들이 사울과 그 아들들을 바짝 뒤쫓았다. 요나단도 아버지 곁에서 쓰러졌다. (삼상 31:2)', fx: 'battle',
+        actors: [
+          { id: 'jonathanB', x: 132, y: 178, anim: 'fall' }, { id: 'saul', x: 188, y: 184, anim: 'hurt' },
+          { id: 'philA', x: 250, y: 176, flip: true, anim: 'fight' }, { id: 'philB', x: 290, y: 188, flip: true, anim: 'fight' }, { id: 'philD', x: 410, y: 178, flip: true, anim: 'fight' },
+        ],
+      },
+      {
+        text: '싸움이 사울에게 거세졌다. 활 쏘는 사람들이 사울을 찾아내어, 사울은 크게 다쳤다. (삼상 31:3)', fx: 'battle',
+        actors: [
+          { id: 'jonathanB', x: 132, y: 178, down: true }, { id: 'saul', x: 196, y: 184, anim: 'kneel' },
+          { id: 'philC', x: 320, y: 188, flip: true }, { id: 'philD', x: 380, y: 172, flip: true, anim: 'fight' }, { id: 'philD', x: 430, y: 186, flip: true, anim: 'fight' },
+        ],
+      },
+      { who: 'saul', text: '요나단… 내 아들아… 여호와께서 나를 떠나셨구나.' },
+      {
+        text: '그날 사울과 그의 세 아들, 그리고 그의 사람들이 다 함께 죽었다. (삼상 31:6)', fx: 'dusk',
+        actors: [{ id: 'jonathanB', x: 132, y: 178, down: true }, { id: 'saul', x: 196, y: 184, anim: 'fall' }],
+      },
+      { text: '해가 진 길보아 산 위에는 왕관과 활만이 남았다. (삼하 1:10, 22)', fx: 'gilboa', actors: [] },
       { text: '소식을 들은 다윗은 옷을 찢고, 저녁이 될 때까지 울며 금식했다. (삼하 1:11-12)', bg: 'wild', actors: [{ id: 'davidS', x: 230, y: 190, anim: 'kneel' }] },
       { who: 'david', text: '이스라엘아, 어찌하여 용사들이 엎드러졌는가! 사울과 요나단은 살아 있을 때 사랑스럽고 아름다웠으니… (삼하 1:19, 23)' },
       { who: 'david', text: '내 형 요나단이여, 그대 때문에 내 마음이 아프오. 그대는 내게 참으로 귀한 사람이었소. (삼하 1:26)' },

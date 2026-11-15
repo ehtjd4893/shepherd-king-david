@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
-import { frameOf, downOf, sheepFrame, portraitOf, bgBeth, bgField, bgElah, bgGibeah, bgWild, bgZiklag, bgJebus, bgZion, frame, R } from './art.ts';
+import { frameOf, downOf, sheepFrame, portraitOf, bgBeth, bgField, bgElah, bgGibeah, bgWild, bgZiklag, bgJebus, bgZion, bgGilboa, frame, R } from './art.ts';
 import { sfx } from './sfx.ts';
-import { CUTSCENES, NAMES, type Actor, type Cutscene } from './cutscenes.ts';
+import { CUTSCENES, NAMES, type Actor, type Beat, type Cutscene } from './cutscenes.ts';
 
-const BACKDROPS = { beth: bgBeth, field: () => bgField(480), elah: () => bgElah(480), gibeah: () => bgGibeah(480), wild: () => bgWild(480), ziklag: () => bgZiklag(480), jebus: () => bgJebus(480), zion: () => bgZion(480) };
+const BACKDROPS = { beth: bgBeth, field: () => bgField(480), elah: () => bgElah(480), gibeah: () => bgGibeah(480), wild: () => bgWild(480), ziklag: () => bgZiklag(480), jebus: () => bgJebus(480), zion: () => bgZion(480), gilboa: () => bgGilboa(480) };
 
 const FONT = '"Do Hyeon", "Apple SD Gothic Neo", sans-serif';
 const CPS = 30; // characters typed per second
@@ -15,7 +15,8 @@ export class CutsceneScene extends Phaser.Scene {
   private lineT = 0;
   private T = 0;
   private started = false;
-  private cast: { a: Actor; img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse }[] = [];
+  /** t0: when the figure came on stage (a fall plays out from then, even across lines) */
+  private cast: { a: Actor; img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; t0: number }[] = [];
   private origins = new Map<string, [number, number]>();
   private box!: Phaser.Textures.CanvasTexture;
   private name!: Phaser.GameObjects.Text;
@@ -24,7 +25,7 @@ export class CutsceneScene extends Phaser.Scene {
   private fx!: Phaser.GameObjects.Graphics;
   private ui!: Phaser.GameObjects.Graphics;
   private anointing = false;
-  private gilboa = false;
+  private gilboa: Beat['fx'] | null = null;
   private backdrop!: Phaser.GameObjects.Image;
   private qteGot = 0;
   private scribbles: number[][] = [];
@@ -35,7 +36,7 @@ export class CutsceneScene extends Phaser.Scene {
 
   init(d: { id: string }) {
     this.cs = CUTSCENES[d.id];
-    this.i = 0; this.lineT = 0; this.T = 0; this.started = false; this.cast = []; this.anointing = false; this.gilboa = false; this.qteGot = 0; this.scribbles = [];
+    this.i = 0; this.lineT = 0; this.T = 0; this.started = false; this.cast = []; this.anointing = false; this.gilboa = null; this.qteGot = 0; this.scribbles = [];
   }
 
   create() {
@@ -63,7 +64,6 @@ export class CutsceneScene extends Phaser.Scene {
   }
 
   private setBackdrop(bg: Cutscene['bg']) {
-    if (bg === 'dark') { this.backdrop.setVisible(false); return; }
     const key = `bg_${bg}480`;
     if (!this.textures.exists(key)) this.textures.addCanvas(key, BACKDROPS[bg]());
     this.backdrop.setTexture(key).setVisible(true);
@@ -86,7 +86,7 @@ export class CutsceneScene extends Phaser.Scene {
     this.qteGot = 0; this.scribbles = [];
     if (b.banner) this.banner(b.banner);
     if (b.bg) this.setBackdrop(b.bg);
-    if (b.fx === 'gilboa') this.gilboa = true; else if (b.bg) this.gilboa = false;
+    if (b.fx === 'battle' || b.fx === 'dusk' || b.fx === 'gilboa') this.gilboa = b.fx; else if (b.bg) this.gilboa = null;
     if (b.fx === 'anoint') this.anointing = true;
     else if (b.actors) this.anointing = false;
     if (b.actors) {
@@ -95,6 +95,7 @@ export class CutsceneScene extends Phaser.Scene {
         a,
         shadow: this.add.ellipse(a.x, a.y, (a.id === 'sheep' ? 18 : 20) * (a.k ?? 1) * (a.down ? 1.8 : 1), 5 * (a.k ?? 1), 0x28161e, 0.32),
         img: this.add.image(a.x, a.y, this.frameKey(a.id, a.anim ?? 'idle', 0, a.k, a.down)).setFlipX(!!a.flip).setDepth(a.y),
+        t0: this.T,
       }));
     }
     // dialogue box: portrait + name tab for speakers, full width for narration
@@ -163,10 +164,16 @@ export class CutsceneScene extends Phaser.Scene {
     for (const c of this.cast) {
       const a = c.a, walkIn = a.from !== undefined && this.lineT < 1.1 && !!b.actors;
       const x = walkIn ? a.from! + (a.x - a.from!) * (this.lineT / 1.1) : a.x;
-      const anim = a.down ? 'hurt' : walkIn ? 'walk' : a.anim === 'flail' ? (this.qteGot % 2 ? 'atk3' : 'jump') : a.anim ?? 'idle';
+      const fight = Math.floor(this.T * 2.2 + a.x * 0.013) % 2 ? 'atk' : 'atkA'; // each fighter on his own beat
+      const anim = a.down ? 'hurt' : walkIn ? 'walk' : a.anim === 'flail' ? (this.qteGot % 2 ? 'atk3' : 'jump') : a.anim === 'fight' ? fight : a.anim === 'fall' ? 'hurt' : a.anim ?? 'idle';
       const f = a.down ? 0 : a.id === 'sheep' ? (walkIn ? Math.floor(this.T * 8) % 2 : 0) : anim === 'walk' ? Math.floor(this.T * 8) % 4 : anim === 'idle' || anim === 'laugh' ? Math.floor(this.T * 2.5) % 2 : anim === 'harp' ? Math.floor(this.T * 6) % 2 : 0;
       const key = this.frameKey(a.id, a.id === 'sheep' ? 'idle' : anim, f, a.k, a.down), o = this.origins.get(key)!;
       c.img.setTexture(key).setOrigin(o[0], o[1]).setPosition(Math.round(x), a.y);
+      if (a.anim === 'fall') {
+        // a beat on his feet, then he topples over backwards about his feet
+        const p = Math.min(1, Math.max(0, (this.T - c.t0 - 0.35) / 0.55) ** 2);
+        c.img.setAngle((a.flip ? 90 : -90) * p);
+      }
       c.shadow.setPosition(Math.round(x), a.y);
     }
 
@@ -180,16 +187,28 @@ export class CutsceneScene extends Phaser.Scene {
         if ((Math.floor(this.T * 8) + i) % 3) { this.fx.fillStyle(i % 3 ? 0xf2c14e : 0xffffff, 1).fillRect(x - 1, y, 3, 1).fillRect(x, y - 1, 1, 3); }
       }
     }
-    if (this.gilboa) {
-      // Mount Gilboa at dusk, only in silhouette: Saul's crown and Jonathan's bow fall onto the slope
-      const sky = [0x2a0a12, 0x4a1418, 0x6a2018, 0x8a3018, 0x3a1010];
-      sky.forEach((c, i) => this.fx.fillStyle(c, 1).fillRect(0, i * 34, 480, 34));
-      this.fx.fillStyle(0x3a1010, 1).fillRect(0, 170, 480, 100);
-      this.fx.fillStyle(0x0d0a14, 1);
-      for (let x = 0; x < 480; x += 2) { const h = 96 + Math.abs(x - 232) * 0.42 + Math.sin(x * 0.07) * 4; this.fx.fillRect(x, h, 2, 270 - h); }
-      const t = Math.min(1, this.lineT / 2.2), cy = 30 + t * 64, by = 20 + Math.min(1, this.lineT / 2.6) * 86;
-      this.fx.fillStyle(0xf2c14e, 1).fillRect(204, cy, 20, 6).fillTriangle(204, cy, 208, cy - 7, 212, cy).fillTriangle(212, cy, 216, cy - 7, 220, cy).fillTriangle(218, cy, 222, cy - 6, 224, cy);
-      this.fx.lineStyle(2, 0x9a6a40, 1).beginPath().arc(262, by + 10, 14, -1.2, 1.2).strokePath().lineStyle(1, 0xe8e0cc, 1).lineBetween(262 + 14 * Math.cos(-1.2), by + 10 + 14 * Math.sin(-1.2), 262 + 14 * Math.cos(1.2), by + 10 + 14 * Math.sin(1.2));
+    if (this.gilboa === 'battle') {
+      // arrows from the Philistine archers on the right, arcing over the slope
+      for (let i = 0; i < 9; i++) {
+        const ph = (this.T * 0.8 + i * 0.29) % 1, x = Math.round(452 - ph * 380), y = Math.round(128 + ((i * 23) % 40) - Math.sin(ph * Math.PI) * 30), dy = Math.round(-Math.cos(ph * Math.PI) * 4);
+        this.fx.lineStyle(2, 0x1c1018, 1).lineBetween(x, y, x + 14, y - dy); // dark outline so it reads against the sky
+        this.fx.lineStyle(1, 0xd8c098, 1).lineBetween(x, y, x + 14, y - dy);
+        this.fx.fillStyle(0xdfe3e8, 1).fillTriangle(x - 3, y, x + 1, y - 2, x + 1, y + 2).fillStyle(0xf3ecd9, 1).fillRect(x + 12, y - dy - 2, 3, 1).fillRect(x + 12, y - dy + 1, 3, 1);
+      }
+    } else if (this.gilboa) {
+      // the light goes; on the last line Saul's crown and Jonathan's bow fall and lie on the slope
+      const dim = this.gilboa === 'dusk' ? Math.min(0.45, this.lineT * 0.2) : 0.55;
+      this.fx.fillStyle(0x12040e, dim).fillRect(0, 0, 480, 270);
+      if (this.gilboa === 'gilboa') {
+        const cy = 40 + Math.min(1, (this.lineT / 1.4) ** 2) * 150, by = 26 + Math.min(1, (this.lineT / 1.8) ** 2) * 166;
+        this.fx.fillStyle(0xf2c14e, 1).fillRect(204, cy, 20, 6).fillTriangle(204, cy, 208, cy - 7, 212, cy).fillTriangle(212, cy, 216, cy - 7, 220, cy).fillTriangle(218, cy, 222, cy - 6, 224, cy);
+        this.fx.fillStyle(0xc0882a, 1).fillRect(204, cy + 4, 20, 2);
+        // the bow lying on its back: the lower part of a circle, string across the top
+        const bx = 266, bcy = by - 12, a0 = 0.35, a1 = Math.PI - 0.35;
+        this.fx.lineStyle(2, 0x9a6a40, 1).beginPath().arc(bx, bcy, 16, a0, a1, false).strokePath();
+        this.fx.lineStyle(1, 0xe8e0cc, 1).lineBetween(bx + 16 * Math.cos(a0), bcy + 16 * Math.sin(a0), bx + 16 * Math.cos(a1), bcy + 16 * Math.sin(a1));
+        if (this.lineT > 1.8 && Math.floor(this.T * 3) % 2) this.fx.fillStyle(0xffffff, 1).fillRect(213, cy - 3, 1, 3).fillRect(212, cy - 2, 3, 1); // a glint on the crown
+      }
     }
     this.ui.clear();
     const q = b.qte;

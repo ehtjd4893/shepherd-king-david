@@ -220,6 +220,7 @@ const POSE={
     case 'sweep':return{lean:3,fF:[9,0],fB:[-6,0],hF:[14,-20],hB:[6,-19],item:it,ia:.15,shield:sh,mouth:1};
     case 'stuck':return{lean:5,bob:2,hy:2,fF:[8,0],fB:[-7,0],hF:[13,-10],hB:[8,-11],item:it,ia:.85,mouth:1};
     case 'laugh':return{lean:-3,hy:-2,bob:f%2,fF:[4,0],fB:[-4,0],hF:[8,-17+f%2],hB:[-2,-12],item:it,ia:-1.35,mouth:1};
+    case 'kneel':return{bob:6,kF:[8,-7],fF:[8,0],kB:[0,-1],fB:[-7,-1],hF:[9,-16],hB:[3,-9],hy:2,hx:1,item:it,ia:-1.45,shield:sh}; // down on one knee, leaning on the weapon
     default:return{bob:b,hF:[7,-16+b],hB:[-3,-16+b],item:it,ia:ia0,shield:sh}}},
   samuel(a,f){const b=f%2;if(a==='anoint')return{lean:1,hF:[9,-43],hB:[-3,-15],item:'horn',ia:.8};return{bob:b,hF:[6,-17+b],hB:[-4,-14+b],item:'horn',ia:-.7}},
   jesse(a,f){const b=f%2;return{bob:b,hF:[6,-14+b],hB:[-4,-14+b],item:'staff',ia:-1.5}},
@@ -266,6 +267,7 @@ CAST.jebusite={skin:C.skinP,skinD:C.skinPD,hair:C.dark,hairStyle:'helmet',beard:
 CAST.jebArcher={...CAST.jebusite,armor:null,tunic:'#6a7a5a',tunicD:'#4a5a3e',tunicL:'#8a9a78',weapon:'bow',wu:80};
 CAST.lord={...CAST.jebusite,armor:'scale',armorC:C.gold,armorD:C.goldD,trim:C.gold,sash:C.gold,shield:1,crown:1,tunic:'#2e4848',tunicD:'#1a2e2e',tunicL:'#4a6a6a',spearLen:26,wu:110};
 CAST.jonathan={skin:C.skin,skinD:C.skinD,hair:C.dark,hairStyle:'king',tunic:C.blue,tunicD:C.blueD,tunicL:C.blueL,sash:C.gold,trim:C.gold,leg:C.skin,legD:C.skinD,shoe:C.wood,pose:'bro',wu:40,tall:1.06};
+CAST.jonathanB={...CAST.jonathan,pose:'soldier',weapon:'bow',wu:80}; // Jonathan the archer at Gilboa (2 Sam 1:22)
 CAST.thief={skin:C.skinP,skinD:C.skinPD,hair:C.dark,hairStyle:'hood',hood:'#7a5a3c',tunic:'#5c4433',tunicD:'#3e2c20',tunicL:'#7a5c44',sash:C.oatD,fringe:1,beard:C.beard,beardD:C.beardD,beardLen:3,leg:C.skinP,legD:C.skinPD,shoe:C.woodD,pose:'soldier',weapon:'club',wu:80};
 CAST.raider={...CAST.thief,hood:'#8a3a30',tunic:'#a8865a',tunicD:'#7a5e3e',tunicL:'#c8a676',sash:C.kiltD};
 // four-legged cast: units at size 1, facing right, feet on y=0
@@ -509,6 +511,24 @@ export function bgZiklag(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(67),camp=SW
   for(let i=0;i<650*n;i++){const x=rnd()*SW,y=150+rnd()*110;R(g,x,y,1,1,rnd()<.5?'#b8966a':'#f0d8a8')}
   for(let i=0;i<40;i++){const x=rnd()*560,y=158+rnd()*90;R(g,x,y,3,1,'#3a2e28');R(g,x+1,y-1,1,1,'#f08a3a')}
   for(let i=0;i<10*n;i++){const x=rnd()*SW,y=160+rnd()*86;for(let j=0;j<9;j++)R(g,x+j*2,y-Math.round(Math.sin(j*.8)*2),2,1,'#c8a470')}
+  return c}
+// Mount Gilboa at sundown (1 Sam 31): a red sky, the ridge in shadow, a stony slope strewn with spears and shields.
+export function bgGilboa(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(89);
+  sky(g,['#2e1430','#5a1e34','#8e3434','#c45a34','#e8883e'],0,132,SW);
+  D(g,372,112,18,'#f6c46a');D(g,372,112,15,'#ffe09a');
+  for(let i=0;i<5;i++){const y=30+i*16+rd(rnd()*6),x=rd(rnd()*SW);R(g,x,y,40+rd(rnd()*50),2,'#a8443a');R(g,x+8,y+2,24,1,'#7a2e34')}
+  const far=x=>108-10*Math.sin(x*.009+2)-5*Math.sin(x*.031);
+  for(let x=0;x<SW;x++){const h=rd(far(x));R(g,x,h,1,150-h,'#4a2238');R(g,x,h,1,1,'#6a3040')}
+  const ridge=x=>150-58*Math.max(0,1-Math.abs(x-150)/260)-4*Math.sin(x*.05);
+  for(let x=0;x<SW;x++){const h=rd(ridge(x));R(g,x,h,1,152-h,'#2a1626');R(g,x,h,1,1,'#5a2a34');for(let y=h+3;y<152;y+=4)if((x*3+y)%11===0)R(g,x,y,1,1,'#3e2030')}
+  for(let x=20;x<SW;x+=46+rd(rnd()*40)){const y=rd(ridge(x))+1;L(g,x,y,x,y-6,1,'#1c0e18');D(g,x,y-8,3,'#1c0e18')}
+  for(let y=148;y<270;y++)R(g,0,y,SW,1,y<150?'#3a2228':y<172?'#5c3a32':y<214?'#6a4636':'#76503a');
+  for(let i=0;i<700;i++){const x=rnd()*SW,y=150+rnd()*112;R(g,x,y,1,1,rnd()<.5?'#4e3028':'#8a6248')}
+  for(let i=0;i<26;i++){const x=rnd()*SW,y=158+rnd()*96,r=1+rd(rnd()*3);D(g,x,y,r+1,'#3a2624');D(g,x,y-1,r,'#7a6458');R(g,x-r+1,y-r,2,1,'#a08a7a')}
+  for(let i=0;i<24;i++){const x=rd(rnd()*SW),y=rd(160+rnd()*96);R(g,x,y-3,1,3,'#6a6a2e');R(g,x-1,y-2,1,2,'#6a6a2e');R(g,x+1,y-2,1,2,'#8a7a3a')}
+  // the battle's leavings: spears stuck in the ground, dropped round shields
+  for(let i=0;i<7;i++){const x=rd(30+rnd()*420),y=rd(162+rnd()*84),t=rnd()<.5?-1:1;L(g,x,y,x+t*5,y-22,1,C.woodD);R(g,x+t*5-1,y-25,2,3,C.iron)}
+  for(let i=0;i<4;i++){const x=rd(40+rnd()*400),y=rd(170+rnd()*80);D(g,x,y,5,C.bronzeD);D(g,x,y-1,4,C.bronze);R(g,x-1,y-2,2,2,C.bronzeL)}
   return c}
 // Below Jebus: olive slopes climbing to the city walls on the ridge (2 Sam 5:6).
 export function bgJebus(SW){const c=mk(SW,270),g=ctx2(c),rnd=seeded(71);
